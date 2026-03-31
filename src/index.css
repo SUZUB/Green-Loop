@@ -1,0 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 150 20% 98%;
+    --foreground: 160 30% 10%;
+
+    --card: 150 15% 97%;
+    --card-foreground: 160 30% 10%;
+
+    --popover: 150 15% 97%;
+    --popover-foreground: 160 30% 10%;
+
+    --primary: 152 60% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 200 65% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 150 15% 92%;
+    --muted-foreground: 160 10% 45%;
+
+    --accent: 165 50% 90%;
+    --accent-foreground: 160 30% 15%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 15% 88%;
+    --input: 150 15% 88%;
+    --ring: 152 60% 36%;
+
+    --radius: 0.75rem;
+
+    --earth: 35 60% 50%;
+    --earth-foreground: 0 0% 100%;
+    --ocean: 200 65% 45%;
+    --ocean-foreground: 0 0% 100%;
+    --leaf: 130 50% 45%;
+    --leaf-foreground: 0 0% 100%;
+    --sand: 42 40% 85%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --gold: 43 96% 56%;
+    --gold-foreground: 0 0% 100%;
+    --emerald: 160 84% 39%;
+    --emerald-foreground: 0 0% 100%;
+
+    --gradient-hero: linear-gradient(135deg, hsl(152 60% 36%), hsl(200 65% 45%));
+    --gradient-card: linear-gradient(145deg, hsl(150 15% 97%), hsl(165 50% 95%));
+    --gradient-warm: linear-gradient(135deg, hsl(152 60% 36%), hsl(130 50% 45%));
+    --shadow-soft: 0 4px 20px -4px hsl(152 60% 36% / 0.15);
+    --shadow-card: 0 2px 12px -2px hsl(160 30% 10% / 0.08);
+    --shadow-elevated: 0 8px 30px -8px hsl(152 60% 36% / 0.2);
+
+    --sidebar-background: 150 20% 96%;
+    --sidebar-foreground: 160 30% 10%;
+    --sidebar-primary: 152 60% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 165 50% 90%;
+    --sidebar-accent-foreground: 160 30% 15%;
+    --sidebar-border: 150 15% 88%;
+    --sidebar-ring: 152 60% 36%;
+  }
+
+  .dark {
+    --background: 160 25% 6%;
+    --foreground: 150 15% 92%;
+    --card: 160 20% 10%;
+    --card-foreground: 150 15% 92%;
+    --popover: 160 20% 10%;
+    --popover-foreground: 150 15% 92%;
+    --primary: 152 55% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 200 55% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 160 15% 15%;
+    --muted-foreground: 150 10% 55%;
+    --accent: 165 30% 18%;
+    --accent-foreground: 150 15% 92%;
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 160 15% 18%;
+    --input: 160 15% 18%;
+    --ring: 152 55% 45%;
+    --sidebar-background: 160 25% 8%;
+    --sidebar-foreground: 150 15% 92%;
+    --sidebar-primary: 152 55% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 165 30% 18%;
+    --sidebar-accent-foreground: 150 15% 92%;
+    --sidebar-border: 160 15% 18%;
+    --sidebar-ring: 152 55% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-hero);
+  }
+  .bg-hero-gradient {
+    background-image: var(--gradient-hero);
+  }
+  .bg-card-gradient {
+    background-image: var(--gradient-card);
+  }
+  .bg-warm-gradient {
+    background-image: var(--gradient-warm);
+  }
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+
+  /* High-contrast scrollbar styling */
+  .scrollbar-emerald {
+    scrollbar-color: rgba(16, 185, 129, 0.5) rgba(30, 41, 59, 0.3);
+    scrollbar-width: thin;
+  }
+  
+  .scrollbar-emerald::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-emerald::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.3);
+    border-radius: 10px;
+  }
+  
+  .scrollbar-emerald::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.6), rgba(34, 197, 94, 0.4));
+    border-radius: 10px;
+  }
+  
+  .scrollbar-emerald::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.6));
+  }
+}
