@@ -11,7 +11,7 @@ const roles = [
     title: "I'm a Plastic Recycler",
     description: "Give plastic from your home. Schedule pickups and earn rewards for every gram you recycle.",
     path: "/auth/login?role=recycler",
-    color: "bg-primary",
+    color: "bg-leaf",
   },
   {
     icon: Truck,

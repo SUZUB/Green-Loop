@@ -56,8 +56,9 @@ const App = () => (
                 <Route path="/auth/login" element={<Login />} />
                 <Route path="/auth/signup" element={<Signup />} />
 
-                {/* Protected routes with Layout */}
+                {/* Protected routes with Layout - Separate for each role */}
                 <Route element={<Layout><AIChatBot /></Layout>}>
+                  {/* Recycler Routes */}
                   <Route element={<RecyclerLayout />}>
                     <Route path="/recycler/dashboard" element={<RecyclerDashboard />} />
                     <Route path="/recycler/booking" element={<Booking />} />
@@ -73,7 +74,11 @@ const App = () => (
                     <Route path="/community" element={<Community />} />
                     <Route path="/partners" element={<Partners />} />
                   </Route>
+                  
+                  {/* Picker Routes - Standalone */}
                   <Route path="/picker/dashboard" element={<PickerDashboard />} />
+                  
+                  {/* Buyer Routes - Standalone */}
                   <Route path="/buyer/dashboard" element={<BuyerDashboard />} />
                   <Route path="/buyer/listings" element={<BuyerListings />} />
                   <Route path="/buyer/orders" element={<BuyerOrders />} />
@@ -83,6 +88,7 @@ const App = () => (
                   <Route path="/buyer/messages" element={<BuyerMessages />} />
                   <Route path="/buyer/payments" element={<BuyerPayments />} />
                   <Route path="/buyer/carbon-market" element={<CarbonMarket />} />
+                  
                   <Route path="/challenges" element={<ChallengesPage />} />
                 </Route>
 
