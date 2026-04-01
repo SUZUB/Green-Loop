@@ -41,6 +41,54 @@ export type Database = {
         }
         Relationships: []
       }
+      pickups: {
+        Row: {
+          id: string
+          recycler_id: string
+          picker_id: string | null
+          lat: number
+          lng: number
+          address: string
+          weight_kg: number
+          status: "AVAILABLE" | "ASSIGNED" | "COMPLETED"
+          notes: string | null
+          verification_token: string | null
+          reward_points: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          recycler_id: string
+          picker_id?: string | null
+          lat: number
+          lng: number
+          address?: string
+          weight_kg?: number
+          status?: "AVAILABLE" | "ASSIGNED" | "COMPLETED"
+          notes?: string | null
+          verification_token?: string | null
+          reward_points?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          recycler_id?: string
+          picker_id?: string | null
+          lat?: number
+          lng?: number
+          address?: string
+          weight_kg?: number
+          status?: "AVAILABLE" | "ASSIGNED" | "COMPLETED"
+          notes?: string | null
+          verification_token?: string | null
+          reward_points?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -171,6 +219,50 @@ export type Database = {
           p_recycler_id: string
           p_weight_kg: number
         }
+        Returns: Json
+      }
+      accept_pickup: {
+        Args: { p_pickup_id: string }
+        Returns: {
+          id: string
+          recycler_id: string
+          picker_id: string | null
+          lat: number
+          lng: number
+          address: string
+          weight_kg: number
+          status: "AVAILABLE" | "ASSIGNED" | "COMPLETED"
+          notes: string | null
+          verification_token: string | null
+          reward_points: number
+          created_at: string
+          updated_at: string
+        }
+      }
+      complete_pickup: {
+        Args: { p_pickup_id: string }
+        Returns: {
+          id: string
+          recycler_id: string
+          picker_id: string | null
+          lat: number
+          lng: number
+          address: string
+          weight_kg: number
+          status: "AVAILABLE" | "ASSIGNED" | "COMPLETED"
+          notes: string | null
+          verification_token: string | null
+          reward_points: number
+          created_at: string
+          updated_at: string
+        }
+      }
+      generate_pickup_token: {
+        Args: { p_pickup_id: string }
+        Returns: string
+      }
+      verify_pickup_token: {
+        Args: { p_token: string }
         Returns: Json
       }
     }

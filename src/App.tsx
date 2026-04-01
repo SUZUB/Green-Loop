@@ -27,6 +27,7 @@ const Wallet = lazy(() => import("./pages/recycler/Wallet"));
 const Referral = lazy(() => import("./pages/recycler/Referral"));
 const Profile = lazy(() => import("./pages/recycler/Profile"));
 const PickerAICamera = lazy(() => import("./pages/picker/AICamera"));
+const PickerAvailablePickups = lazy(() => import("./pages/picker/AvailablePickups"));
 const KnowledgeHub = lazy(() => import("./pages/education/KnowledgeHub"));
 const Community = lazy(() => import("./pages/community/Community"));
 const Partners = lazy(() => import("./pages/partners/Partners"));
@@ -96,6 +97,7 @@ const App = () => (
                     <Route path="/picker/dashboard" element={<PickerDashboard />} />
                     <Route path="/picker/profile" element={<PickerProfile />} />
                     <Route path="/picker/ai-camera" element={<PickerAICamera />} />
+                    <Route path="/picker/available-pickups" element={<PickerAvailablePickups />} />
 
                     {/* Buyer Routes - Standalone */}
                     <Route path="/buyer/dashboard" element={<BuyerDashboard />} />

@@ -760,7 +760,7 @@ interface RecycleHubContextValue {
   addSourcingRequest: (request: Omit<SourcingRequest, "id">) => SourcingRequest;
   addTrackOrder: (order: Omit<OrderTracker, "id"> & { id?: string }) => OrderTracker;
   updateTrackOrderStatus: (orderId: string, status: OrderTracker["status"]) => void;
-  bookPickup: (payload: Omit<PickupBooking, "id" | "status" | "pointsAwarded" | "createdAt">) => PickupBooking;
+  bookPickup: (payload: Omit<PickupBooking, "id" | "status" | "pointsAwarded" | "createdAt">) => Promise<PickupBooking>;
   completePickup: (bookingId: string, actualWeightKg?: number) => PickupBooking | null;
   completePurchase: (quantity: number) => boolean;
   refreshAllData: () => void;
@@ -782,20 +782,17 @@ function useProvideRecycleHub() {
   const [topRecyclers, setTopRecyclers] = useState<TopRecycler[]>(INITIAL_TOP_RECYCLERS);
   const [leaderboardUsers, setLeaderboardUsers] = useState<LeaderboardUser[]>(INITIAL_LEADERBOARD_USERS);
   const [quickActionStats, setQuickActionStats] = useState<QuickActionStats>(INITIAL_QUICK_ACTION_STATS);
-  const [userBalance, setUserBalance] = useState<number>(840);
+  const [userBalance, setUserBalance] = useState<number>(0);
   const [availableMarketCredits, setAvailableMarketCredits] = useState<number>(200);
-  const [fullTransactionList, setFullTransactionList] = useState<MarketTransaction[]>(INITIAL_MARKET_TRANSACTIONS);
+  const [fullTransactionList, setFullTransactionList] = useState<MarketTransaction[]>([]);
   const [joinedChallengeIds, setJoinedChallengeIds] = useState<Set<string>>(new Set());
   const [authUserId, setAuthUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    const storedBalance = window.localStorage.getItem(MARKET_STORAGE_KEYS.userBalance);
+    // Only restore non-user-specific UI state from localStorage.
+    // User balance and stats are loaded from Supabase in the auth effect below.
     const storedAvailableCredits = window.localStorage.getItem(MARKET_STORAGE_KEYS.availableMarketCredits);
     const storedTransactions = window.localStorage.getItem(MARKET_STORAGE_KEYS.transactions);
-
-    if (storedBalance !== null) {
-      setUserBalance(Number(storedBalance));
-    }
 
     if (storedAvailableCredits !== null) {
       setAvailableMarketCredits(Number(storedAvailableCredits));
@@ -804,11 +801,11 @@ function useProvideRecycleHub() {
     if (storedTransactions) {
       try {
         const parsed = JSON.parse(storedTransactions) as MarketTransaction[];
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           setFullTransactionList(parsed);
         }
       } catch {
-        setFullTransactionList(INITIAL_MARKET_TRANSACTIONS);
+        // leave as empty array
       }
     }
 
@@ -936,16 +933,43 @@ function useProvideRecycleHub() {
           if (!cancelled) setAuthUserId(null);
           return;
         }
+
+        // Clear stale localStorage data when a different user logs in
+        const storedUid = window.localStorage.getItem("recyclehub_auth_user_id");
+        if (storedUid && storedUid !== user.id) {
+          Object.values(MARKET_STORAGE_KEYS).forEach((key) => window.localStorage.removeItem(key));
+          window.localStorage.removeItem("eco_sync_state");
+        }
+        window.localStorage.setItem("recyclehub_auth_user_id", user.id);
+
         if (!cancelled) setAuthUserId(user.id);
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("coin_balance")
+          .select("coin_balance, total_pickups, total_recycled_kg, total_points, referral_count, consecutive_weeks")
           .eq("id", user.id)
           .maybeSingle();
 
-        if (!cancelled && typeof profile?.coin_balance === "number") {
-          setUserBalance(profile.coin_balance);
+        if (!cancelled && profile) {
+          const p = profile as any;
+          const balance = typeof p.coin_balance === "number" ? p.coin_balance : 0;
+          const pickups = typeof p.total_pickups === "number" ? p.total_pickups : 0;
+          const kg = typeof p.total_recycled_kg === "number" ? p.total_recycled_kg : 0;
+          const points = typeof p.total_points === "number" ? p.total_points : 0;
+          const referrals = typeof p.referral_count === "number" ? p.referral_count : 0;
+          const weeks = typeof p.consecutive_weeks === "number" ? p.consecutive_weeks : 0;
+
+          setUserBalance(balance);
+
+          // Sync quickActionStats from real profile data
+          setQuickActionStats((prev) => ({
+            ...prev,
+            bookPickup: { ...prev.bookPickup, recentPickups: pickups },
+            myImpact: { totalWasteDivertedKg: kg },
+            wallet: { ...prev.wallet, balance, lastEarned: 0 },
+            achievements: { ...prev.achievements, badgesEarned: 0 },
+            referrals: { ...prev.referrals, successfulReferrals: referrals, pendingRewardCredits: 0 },
+          }));
         }
       } catch {
         // If Supabase isn't available, localStorage-backed balance still works.
@@ -954,6 +978,58 @@ function useProvideRecycleHub() {
     loadProfileBalance();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  // Real-time subscription: when any recycling_pickup is inserted or updated,
+  // refresh the pickup queue so pickers see new bookings instantly.
+  useEffect(() => {
+    const channel = supabase
+      .channel("pickup-feed")
+      .on(
+        "postgres_changes" as any,
+        { event: "INSERT", schema: "public", table: "recycling_pickups" },
+        (payload: any) => {
+          const row = payload.new;
+          const newBooking: PickupBooking = {
+            id: row.id,
+            userName: "Recycler",
+            date: row.pickup_date,
+            timeSlot: "morning",
+            weightKg: row.weight_kg,
+            address: "",
+            status: row.status === "completed" ? "Completed" : "Pending",
+            pointsAwarded: row.points_earned ?? 0,
+            createdAt: row.created_at,
+          };
+          setPickupQueue((prev) => {
+            if (prev.some((p) => p.id === row.id)) return prev;
+            return [newBooking, ...prev];
+          });
+          setGlobalMetrics((prev) => ({
+            ...prev,
+            totalPlasticRecycledKg: Number((prev.totalPlasticRecycledKg + row.weight_kg).toFixed(1)),
+          }));
+        }
+      )
+      .on(
+        "postgres_changes" as any,
+        { event: "UPDATE", schema: "public", table: "recycling_pickups" },
+        (payload: any) => {
+          const row = payload.new;
+          setPickupQueue((prev) =>
+            prev.map((p) =>
+              p.id === row.id
+                ? { ...p, status: row.status === "completed" ? "Completed" : "Pending", pointsAwarded: row.points_earned ?? 0 }
+                : p
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -1306,7 +1382,7 @@ function useProvideRecycleHub() {
     setTrackOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
   };
 
-  const bookPickup = (payload: Omit<PickupBooking, "id" | "status" | "pointsAwarded" | "createdAt">) => {
+  const bookPickup = async (payload: Omit<PickupBooking, "id" | "status" | "pointsAwarded" | "createdAt">) => {
     const booking: PickupBooking = {
       id: `PK-${Date.now().toString(36).toUpperCase()}`,
       ...payload,
@@ -1314,6 +1390,22 @@ function useProvideRecycleHub() {
       pointsAwarded: 0,
       createdAt: new Date().toISOString(),
     };
+
+    // Write to Supabase so pickers can see it in real-time
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (auth.user) {
+        await supabase.from("recycling_pickups").insert({
+          user_id: auth.user.id,
+          pickup_date: payload.date,
+          weight_kg: payload.weightKg,
+          points_earned: 0,
+          status: "pending",
+        });
+      }
+    } catch {
+      // Non-fatal — local state still reflects the booking
+    }
 
     setPickupQueue((prev) => [booking, ...prev]);
     setQuickActionStats((prev) => ({

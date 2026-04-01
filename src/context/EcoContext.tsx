@@ -28,17 +28,15 @@ interface EcoState {
 }
 
 const initialState: EcoState = {
-  userBalance: 4250, // Default or load from storage
-  userImpactKg: 124.5,
+  userBalance: 0,
+  userImpactKg: 0,
   activeChallenges: [],
   transactionHistory: [],
   leaderboardData: mockLeaderboardData,
-  // Global stats
   globalPlasticCollected: 12450,
   globalCO2Saved: 6225,
   globalUsersActive: 50000,
   globalPointsDistributed: 1000000,
-  // User profile
   userProfile: {
     name: '',
     email: '',
@@ -187,6 +185,15 @@ const EcoContext = createContext<{
 export function EcoProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(ecoReducer, initialState, (init) => {
     try {
+      // Only restore if it belongs to the current auth session
+      const storedUid = window.localStorage.getItem("recyclehub_auth_user_id");
+      const ecoUid = window.localStorage.getItem("eco_sync_user_id");
+      if (storedUid && ecoUid && storedUid !== ecoUid) {
+        // Different user — start fresh
+        window.localStorage.removeItem("eco_sync_state");
+        window.localStorage.removeItem("eco_sync_user_id");
+        return init;
+      }
       const stored = localStorage.getItem("eco_sync_state");
       if (!stored) return init;
       const parsed = JSON.parse(stored) as unknown;
@@ -199,6 +206,8 @@ export function EcoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       localStorage.setItem("eco_sync_state", JSON.stringify(state));
+      const uid = window.localStorage.getItem("recyclehub_auth_user_id");
+      if (uid) window.localStorage.setItem("eco_sync_user_id", uid);
     } catch {
       // Private mode / quota — do not break the app
     }

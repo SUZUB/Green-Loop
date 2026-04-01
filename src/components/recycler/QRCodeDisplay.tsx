@@ -1,65 +1,125 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { QrCode, Copy, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { QrCode, RefreshCw, Loader2, CheckCircle2 } from "lucide-react";
 
-export function QRCodeDisplay() {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+interface Props {
+  pickupId?: string;
+}
+
+export function QRCodeDisplay({ pickupId }: Props) {
   const { toast } = useToast();
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [noPickup, setNoPickup] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
+  const generateToken = async (id: string) => {
+    setLoading(true);
+    const { data, error } = await supabase.rpc("generate_pickup_token", {
+      p_pickup_id: id,
     });
-  }, []);
-
-  const qrValue = userId ? JSON.stringify({ type: "recycler", id: userId }) : "";
-
-  const handleCopy = () => {
-    if (userId) {
-      navigator.clipboard.writeText(userId);
-      setCopied(true);
-      toast({ title: "ID copied to clipboard!" });
-      setTimeout(() => setCopied(false), 2000);
+    setLoading(false);
+    if (error || !data) {
+      toast({ title: "Could not generate QR", description: error?.message, variant: "destructive" });
+      return;
     }
+    setToken(data as string);
   };
 
-  if (!userId) {
+  useEffect(() => {
+    if (pickupId) {
+      generateToken(pickupId);
+      return;
+    }
+
+    async function findLatestPickup() {
+      setLoading(true);
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) { setLoading(false); return; }
+
+      const { data } = await supabase
+        .from("pickups")
+        .select("id, verification_token, status")
+        .eq("recycler_id", auth.user.id)
+        .in("status", ["AVAILABLE", "ASSIGNED"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setLoading(false);
+
+      if (!data) { setNoPickup(true); return; }
+
+      if ((data as any).verification_token) {
+        setToken((data as any).verification_token);
+      } else {
+        await generateToken((data as any).id);
+      }
+    }
+
+    findLatestPickup();
+  }, [pickupId]);
+
+  const qrValue = token
+    ? JSON.stringify({ type: "pickup_verify", token })
+    : "";
+
+  if (loading) {
     return (
       <Card className="p-6 text-center">
-        <QrCode className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-        <p className="text-sm text-muted-foreground">Please log in to see your QR code</p>
+        <Loader2 className="h-8 w-8 mx-auto animate-spin text-primary mb-2" />
+        <p className="text-sm text-muted-foreground">Generating verification QR…</p>
+      </Card>
+    );
+  }
+
+  if (noPickup) {
+    return (
+      <Card className="p-6 text-center space-y-2">
+        <QrCode className="h-8 w-8 mx-auto text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">No active pickup found.</p>
+        <p className="text-xs text-muted-foreground">Book a pickup first, then your QR will appear here.</p>
       </Card>
     );
   }
 
   return (
     <Card className="p-6 text-center space-y-4">
-      <div className="flex items-center justify-center gap-2 mb-2">
+      <div className="flex items-center justify-center gap-2">
         <QrCode className="h-5 w-5 text-primary" />
-        <h3 className="font-display font-bold text-lg">My Recycler QR</h3>
+        <h3 className="font-display font-bold text-lg">Pickup Verification QR</h3>
       </div>
       <p className="text-sm text-muted-foreground">
-        Show this QR code to the picker during pickup
+        Show this to the picker when they arrive. Do not share the token digitally.
       </p>
-      <div className="bg-white p-4 rounded-xl inline-block mx-auto">
-        <QRCodeSVG
-          value={qrValue}
-          size={200}
-          bgColor="#ffffff"
-          fgColor="#000000"
-          level="H"
-          includeMargin
-        />
+      {token && (
+        <div className="bg-white p-4 rounded-xl inline-block mx-auto">
+          <QRCodeSVG
+            value={qrValue}
+            size={200}
+            bgColor="#ffffff"
+            fgColor="#000000"
+            level="H"
+            includeMargin
+          />
+        </div>
+      )}
+      <div className="flex justify-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => pickupId ? generateToken(pickupId) : setToken(null)}
+          disabled={loading}
+        >
+          <RefreshCw className="h-4 w-4" /> Regenerate
+        </Button>
       </div>
-      <Button variant="outline" size="sm" className="gap-2" onClick={handleCopy}>
-        {copied ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
-        {copied ? "Copied!" : "Copy ID"}
-      </Button>
+      <p className="text-xs text-muted-foreground">
+        Token refreshes on each regeneration. Old tokens are invalidated automatically.
+      </p>
     </Card>
   );
 }

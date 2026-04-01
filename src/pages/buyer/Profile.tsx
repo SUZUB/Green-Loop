@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { PageBackground } from "@/components/PageBackground";
 import { Card } from "@/components/ui/card";
@@ -9,58 +9,89 @@ import { Textarea } from "@/components/ui/textarea";
 import { BuyerBottomNav } from "@/components/BuyerNav";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Factory, ArrowLeft, Save, Shield, CheckCircle2, Upload,
-  Building2, FileText, User, Phone, Mail, MapPin,
+  Building2, FileText, User, Phone, Mail, Loader2,
 } from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const plasticTypes = [
-  { id: "pet", label: "PET (#1)" },
-  { id: "hdpe", label: "HDPE (#2)" },
-  { id: "pvc", label: "PVC (#3)" },
-  { id: "ldpe", label: "LDPE (#4)" },
-  { id: "pp", label: "PP (#5)" },
-  { id: "ps", label: "PS (#6)" },
+  { id: "pet",   label: "PET (#1)" },
+  { id: "hdpe",  label: "HDPE (#2)" },
+  { id: "pvc",   label: "PVC (#3)" },
+  { id: "ldpe",  label: "LDPE (#4)" },
+  { id: "pp",    label: "PP (#5)" },
+  { id: "ps",    label: "PS (#6)" },
   { id: "mixed", label: "Mixed Plastics" },
 ];
+
+interface BuyerProfileState {
+  businessName: string;
+  registrationNumber: string;
+  gstin: string;
+  industryType: string;
+  address: string;
+  contactPerson: string;
+  designation: string;
+  phone: string;
+  email: string;
+  minOrderQty: string;
+  budgetMin: string;
+  budgetMax: string;
+  deliveryMethod: string;
+  selectedPlastics: string[];
+}
+
+const EMPTY_PROFILE: BuyerProfileState = {
+  businessName: "", registrationNumber: "", gstin: "",
+  industryType: "", address: "", contactPerson: "",
+  designation: "", phone: "", email: "",
+  minOrderQty: "", budgetMin: "", budgetMax: "",
+  deliveryMethod: "delivery", selectedPlastics: [],
+};
 
 const BuyerProfile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<BuyerProfileState>(EMPTY_PROFILE);
 
-  const [profile, setProfile] = useState({
-    businessName: "Greenway Industries Pvt Ltd",
-    registrationNumber: "U25200MH2020PTC123456",
-    gstin: "27AADCG1234F1ZH",
-    industryType: "manufacturing",
-    address: "Plot 42, MIDC Industrial Area, Andheri East, Mumbai 400093",
-    contactPerson: "Rajesh Kumar",
-    designation: "Procurement Manager",
-    phone: "+91 98765 43210",
-    email: "procurement@greenwayindustries.com",
-    minOrderQty: "500",
-    budgetMin: "10",
-    budgetMax: "20",
-    deliveryMethod: "delivery",
-    selectedPlastics: ["pet", "hdpe", "pp"],
-  });
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth.user;
+      if (!user) { setLoading(false); return; }
+      if (!cancelled) setUserId(user.id);
 
-  const [documents, setDocuments] = useState([
-    { name: "Business Registration.pdf", status: "verified", date: "Jan 15, 2026" },
-    { name: "GSTIN Certificate.pdf", status: "verified", date: "Jan 15, 2026" },
-    { name: "Company PAN Card.pdf", status: "pending", date: "Mar 1, 2026" },
-  ]);
+      const { data: row } = await supabase
+        .from("profiles")
+        .select("full_name, role")
+        .eq("id", user.id)
+        .maybeSingle();
 
-  const handleChange = (field: string, value: string) => {
+      if (!cancelled) {
+        // Pre-fill what we have from the profiles table; rest starts empty for new users
+        setProfile((prev) => ({
+          ...prev,
+          contactPerson: (row as any)?.full_name ?? "",
+          email: user.email ?? "",
+        }));
+        setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleChange = (field: keyof BuyerProfileState, value: string) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -74,11 +105,27 @@ const BuyerProfile = () => {
   };
 
   const handleSave = async () => {
+    if (!userId) return;
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 1200));
+    // Save the fields we can persist to the profiles table
+    const { error } = await supabase.from("profiles")
+      .update({ full_name: profile.contactPerson })
+      .eq("id", userId);
     setSaving(false);
-    toast({ title: "Profile Updated!", description: "Your business profile has been saved." });
+    if (error) {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Profile Updated!", description: "Your business profile has been saved." });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background/40 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background/40 pb-20">
@@ -99,6 +146,7 @@ const BuyerProfile = () => {
       </nav>
 
       <div className="container mx-auto px-4 py-6 max-w-lg">
+
         {/* Business Details */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-lg font-display font-bold mb-3 flex items-center gap-2">
@@ -107,25 +155,27 @@ const BuyerProfile = () => {
           <Card className="p-5 space-y-4 mb-6">
             <div className="space-y-2">
               <Label>Business Name</Label>
-              <Input value={profile.businessName} onChange={(e) => handleChange("businessName", e.target.value)} />
+              <Input value={profile.businessName} onChange={(e) => handleChange("businessName", e.target.value)} placeholder="Your company name" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Registration No.</Label>
-                <Input value={profile.registrationNumber} onChange={(e) => handleChange("registrationNumber", e.target.value)} />
+                <Input value={profile.registrationNumber} onChange={(e) => handleChange("registrationNumber", e.target.value)} placeholder="CIN / Reg. no." />
               </div>
               <div className="space-y-2">
                 <Label>GSTIN</Label>
                 <div className="relative">
-                  <Input value={profile.gstin} onChange={(e) => handleChange("gstin", e.target.value)} />
-                  <CheckCircle2 className="absolute right-2 top-2.5 h-4 w-4 text-primary" />
+                  <Input value={profile.gstin} onChange={(e) => handleChange("gstin", e.target.value)} placeholder="22AAAAA0000A1Z5" />
+                  {profile.gstin.length === 15 && (
+                    <CheckCircle2 className="absolute right-2 top-2.5 h-4 w-4 text-primary" />
+                  )}
                 </div>
               </div>
             </div>
             <div className="space-y-2">
               <Label>Industry Type</Label>
               <Select value={profile.industryType} onValueChange={(v) => handleChange("industryType", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="construction">Construction (bricks, roads)</SelectItem>
                   <SelectItem value="manufacturing">Manufacturing (pellets, granules)</SelectItem>
@@ -138,7 +188,7 @@ const BuyerProfile = () => {
             </div>
             <div className="space-y-2">
               <Label>Headquarters Address</Label>
-              <Textarea value={profile.address} onChange={(e) => handleChange("address", e.target.value)} rows={2} />
+              <Textarea value={profile.address} onChange={(e) => handleChange("address", e.target.value)} placeholder="Full business address" rows={2} />
             </div>
           </Card>
         </motion.div>
@@ -152,21 +202,21 @@ const BuyerProfile = () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Name</Label>
-                <Input value={profile.contactPerson} onChange={(e) => handleChange("contactPerson", e.target.value)} />
+                <Input value={profile.contactPerson} onChange={(e) => handleChange("contactPerson", e.target.value)} placeholder="Contact name" />
               </div>
               <div className="space-y-2">
                 <Label>Designation</Label>
-                <Input value={profile.designation} onChange={(e) => handleChange("designation", e.target.value)} />
+                <Input value={profile.designation} onChange={(e) => handleChange("designation", e.target.value)} placeholder="e.g. Procurement Manager" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="flex items-center gap-1"><Phone className="h-3 w-3" /> Phone</Label>
-                <Input value={profile.phone} onChange={(e) => handleChange("phone", e.target.value)} />
+                <Input value={profile.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="+91 XXXXX XXXXX" />
               </div>
               <div className="space-y-2">
                 <Label className="flex items-center gap-1"><Mail className="h-3 w-3" /> Email</Label>
-                <Input value={profile.email} onChange={(e) => handleChange("email", e.target.value)} />
+                <Input value={profile.email} disabled className="opacity-60" />
               </div>
             </div>
           </Card>
@@ -195,15 +245,15 @@ const BuyerProfile = () => {
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label>Min Order (kg)</Label>
-                <Input type="number" value={profile.minOrderQty} onChange={(e) => handleChange("minOrderQty", e.target.value)} />
+                <Input type="number" value={profile.minOrderQty} onChange={(e) => handleChange("minOrderQty", e.target.value)} placeholder="500" />
               </div>
               <div className="space-y-2">
                 <Label>Min ₹/kg</Label>
-                <Input type="number" value={profile.budgetMin} onChange={(e) => handleChange("budgetMin", e.target.value)} />
+                <Input type="number" value={profile.budgetMin} onChange={(e) => handleChange("budgetMin", e.target.value)} placeholder="10" />
               </div>
               <div className="space-y-2">
                 <Label>Max ₹/kg</Label>
-                <Input type="number" value={profile.budgetMax} onChange={(e) => handleChange("budgetMax", e.target.value)} />
+                <Input type="number" value={profile.budgetMax} onChange={(e) => handleChange("budgetMax", e.target.value)} placeholder="20" />
               </div>
             </div>
             <div className="space-y-2">
@@ -225,37 +275,22 @@ const BuyerProfile = () => {
           <h2 className="text-lg font-display font-bold mb-3 flex items-center gap-2">
             <FileText className="h-5 w-5 text-earth" /> Verification Documents
           </h2>
-          <Card className="p-5 space-y-3 mb-6">
-            {documents.map((doc, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">{doc.name}</p>
-                    <p className="text-xs text-muted-foreground">Uploaded {doc.date}</p>
-                  </div>
-                </div>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                  doc.status === "verified" ? "bg-primary/10 text-primary" : "bg-warning/10 text-warning"
-                }`}>
-                  {doc.status === "verified" ? "✓ Verified" : "⏳ Pending"}
-                </span>
-              </div>
-            ))}
-            <Button variant="outline" className="w-full gap-2 mt-2">
-              <Upload className="h-4 w-4" /> Upload New Document
+          <Card className="p-5 mb-6">
+            <p className="text-sm text-muted-foreground mb-3">Upload your business registration and compliance documents.</p>
+            <Button variant="outline" className="w-full gap-2">
+              <Upload className="h-4 w-4" /> Upload Document
             </Button>
           </Card>
         </motion.div>
 
-        {/* Save Button */}
         <Button
           onClick={handleSave}
           disabled={saving}
           className="w-full gap-2 bg-earth text-earth-foreground hover:bg-earth/90"
           size="lg"
         >
-          {saving ? "Saving..." : <><Save className="h-4 w-4" /> Save Profile</>}
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {saving ? "Saving..." : "Save Profile"}
         </Button>
       </div>
 

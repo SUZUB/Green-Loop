@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PageBackground } from "@/components/PageBackground";
 import { useNavigate } from "react-router-dom";
 import { useRecycleHub } from "@/hooks/useRecycleHub";
-import { Button } from "@/components/ui/button";
+import { usePickupBroadcast } from "@/hooks/usePickupBroadcast";
+import { supabase } from "@/integrations/supabase/client";import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,6 +56,7 @@ const Booking = () => {
   const [tempAddress, setTempAddress] = useState("");
   const bookingId = `RH-${Date.now().toString(36).toUpperCase()}`;
   const { bookPickup } = useRecycleHub();
+  const { broadcast } = usePickupBroadcast();
 
   // Generate smart suggestions based on selected date
   const getSmartSuggestions = () => {
@@ -353,10 +355,26 @@ const Booking = () => {
                 className="w-full gap-2"
                 size="lg"
                 disabled={!canProceed()}
-                onClick={() => {
+                onClick={async () => {
                   if (step === 3) {
-                    bookPickup({
-                      userName: "Recycler User",
+                    const { data: auth } = await supabase.auth.getUser();
+                    const { data: profile } = auth.user
+                      ? await supabase.from("profiles").select("full_name, lat, lng").eq("id", auth.user.id).maybeSingle()
+                      : { data: null };
+
+                    const lat = (profile as any)?.lat ?? 12.9716;
+                    const lng = (profile as any)?.lng ?? 77.5946;
+
+                    // Broadcast to pickups table — status AVAILABLE, pickers can accept it
+                    await broadcast({
+                      lat,
+                      lng,
+                      address,
+                      weight_kg: Number(weight),
+                    });
+
+                    await bookPickup({
+                      userName: (profile as any)?.full_name || auth.user?.email || "Recycler",
                       date: date?.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) ?? "Today",
                       timeSlot: timeSlot || "morning",
                       weightKg: Number(weight),

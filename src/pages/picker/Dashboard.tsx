@@ -105,6 +105,27 @@ const Dashboard = () => {
   const [pickupHistory, setPickupHistory] = useState<{ id: string; recycler_id: string; weight_kg: number; points_earned: number; created_at: string }[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Real profile from DB
+  const [dbProfile, setDbProfile] = useState<{
+    full_name: string; email: string; coin_balance: number;
+    total_pickups: number; total_recycled_kg: number; created_at: string;
+  } | null>(null);
+
+  useEffect(() => {
+    async function loadProfile() {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth.user;
+      if (!user) return;
+      const { data } = await supabase.from("profiles")
+        .select("full_name, coin_balance, total_pickups, total_recycled_kg, created_at")
+        .eq("id", user.id).maybeSingle();
+      if (data) {
+        setDbProfile({ ...(data as any), email: user.email ?? "" });
+      }
+    }
+    loadProfile();
+  }, []);
+
   useEffect(() => {
     try {
       window.localStorage.setItem("picker_dashboard_show_sections", String(showDashboard));
@@ -326,27 +347,23 @@ const Dashboard = () => {
                 <User className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <p className="font-display font-bold text-lg">Picker #1024</p>
-                <p className="text-sm text-muted-foreground">Active since Jan 2026</p>
+                <p className="font-display font-bold text-lg">{dbProfile?.full_name || "Picker"}</p>
+                <p className="text-sm text-muted-foreground">{dbProfile?.email}</p>
+                {dbProfile?.created_at && (
+                  <p className="text-xs text-muted-foreground">
+                    Active since {new Date(dbProfile.created_at).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
+                  </p>
+                )}
                 <Badge className="mt-1 bg-primary/10 text-primary border-primary/20">Verified</Badge>
-              </div>
-            </Card>
-            <Card className="p-5 space-y-3">
-              <h3 className="font-semibold">Details</h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><p className="text-muted-foreground">Phone</p><p className="font-medium">+91 99887 76655</p></div>
-                <div><p className="text-muted-foreground">Vehicle</p><p className="font-medium">Bike</p></div>
-                <div><p className="text-muted-foreground">Zone</p><p className="font-medium">HSR Layout</p></div>
-                <div><p className="text-muted-foreground">Rating</p><p className="font-medium">4.8 ★</p></div>
               </div>
             </Card>
             <Card className="p-5 space-y-3">
               <h3 className="font-semibold">Lifetime Stats</h3>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><p className="text-muted-foreground">Total Pickups</p><p className="font-bold text-lg">142</p></div>
-                <div><p className="text-muted-foreground">Total Earnings</p><p className="font-bold text-lg">₹4,250</p></div>
-                <div><p className="text-muted-foreground">Weight Collected</p><p className="font-bold text-lg">285 kg</p></div>
-                <div><p className="text-muted-foreground">5-Star Reviews</p><p className="font-bold text-lg">98</p></div>
+                <div><p className="text-muted-foreground">Total Pickups</p><p className="font-bold text-lg">{dbProfile?.total_pickups ?? 0}</p></div>
+                <div><p className="text-muted-foreground">Total Earnings</p><p className="font-bold text-lg">₹{Math.floor((dbProfile?.coin_balance ?? 0) / 10)}</p></div>
+                <div><p className="text-muted-foreground">Weight Collected</p><p className="font-bold text-lg">{dbProfile?.total_recycled_kg ?? 0} kg</p></div>
+                <div><p className="text-muted-foreground">Points Balance</p><p className="font-bold text-lg">{dbProfile?.coin_balance ?? 0}</p></div>
               </div>
             </Card>
           </div>
@@ -384,6 +401,13 @@ const Dashboard = () => {
               <span className="text-[10px] font-medium">{item.label}</span>
             </button>
           ))}
+          <button
+            onClick={() => navigate("/picker/available-pickups")}
+            className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <Package className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Pickups</span>
+          </button>
         </div>
       </div>
     </div>
