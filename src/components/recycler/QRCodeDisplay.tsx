@@ -1,124 +1,123 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { QrCode, RefreshCw, Loader2, CheckCircle2 } from "lucide-react";
+import { QrCode, Loader2, Coins } from "lucide-react";
 
-interface Props {
-  pickupId?: string;
+interface RecyclerQRData {
+  userId: string;
+  name: string;
+  coinBalance: number;
 }
 
-export function QRCodeDisplay({ pickupId }: Props) {
-  const { toast } = useToast();
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [noPickup, setNoPickup] = useState(false);
-
-  const generateToken = async (id: string) => {
-    setLoading(true);
-    const { data, error } = await supabase.rpc("generate_pickup_token", {
-      p_pickup_id: id,
-    });
-    setLoading(false);
-    if (error || !data) {
-      toast({ title: "Could not generate QR", description: error?.message, variant: "destructive" });
-      return;
-    }
-    setToken(data as string);
-  };
+export function QRCodeDisplay() {
+  const [data, setData] = useState<RecyclerQRData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (pickupId) {
-      generateToken(pickupId);
-      return;
-    }
-
-    async function findLatestPickup() {
-      setLoading(true);
+    let cancelled = false;
+    async function load() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { setLoading(false); return; }
 
-      const { data } = await supabase
-        .from("pickups")
-        .select("id, verification_token, status")
-        .eq("recycler_id", auth.user.id)
-        .in("status", ["AVAILABLE", "ASSIGNED"])
-        .order("created_at", { ascending: false })
-        .limit(1)
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, coin_balance")
+        .eq("id", auth.user.id)
         .maybeSingle();
-      setLoading(false);
 
-      if (!data) { setNoPickup(true); return; }
-
-      if ((data as any).verification_token) {
-        setToken((data as any).verification_token);
-      } else {
-        await generateToken((data as any).id);
+      if (!cancelled) {
+        setData({
+          userId: auth.user.id,
+          name: (profile as any)?.full_name ?? "Recycler",
+          coinBalance: (profile as any)?.coin_balance ?? 0,
+        });
+        setLoading(false);
       }
     }
 
-    findLatestPickup();
-  }, [pickupId]);
+    load();
 
-  const qrValue = token
-    ? JSON.stringify({ type: "pickup_verify", token })
-    : "";
+    // Subscribe to real-time balance updates
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      channel = supabase
+        .channel("recycler-qr-balance")
+        .on(
+          "postgres_changes" as any,
+          { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` },
+          (payload: any) => {
+            if (!cancelled) {
+              setData((prev) => prev
+                ? { ...prev, coinBalance: payload.new.coin_balance ?? prev.coinBalance }
+                : prev
+              );
+            }
+          }
+        )
+        .subscribe();
+    });
+
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
 
   if (loading) {
     return (
       <Card className="p-6 text-center">
         <Loader2 className="h-8 w-8 mx-auto animate-spin text-primary mb-2" />
-        <p className="text-sm text-muted-foreground">Generating verification QR…</p>
+        <p className="text-sm text-muted-foreground">Loading your QR code…</p>
       </Card>
     );
   }
 
-  if (noPickup) {
+  if (!data) {
     return (
       <Card className="p-6 text-center space-y-2">
         <QrCode className="h-8 w-8 mx-auto text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">No active pickup found.</p>
-        <p className="text-xs text-muted-foreground">Book a pickup first, then your QR will appear here.</p>
+        <p className="text-sm text-muted-foreground">Please log in to see your QR code.</p>
       </Card>
     );
   }
+
+  const qrValue = JSON.stringify({ type: "recycler", id: data.userId });
 
   return (
     <Card className="p-6 text-center space-y-4">
       <div className="flex items-center justify-center gap-2">
         <QrCode className="h-5 w-5 text-primary" />
-        <h3 className="font-display font-bold text-lg">Pickup Verification QR</h3>
+        <h3 className="font-display font-bold text-lg">My Recycler QR</h3>
       </div>
+
+      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Coins className="h-4 w-4 text-primary" />
+        <span>Current balance: <span className="font-bold text-foreground">{data.coinBalance} credits</span></span>
+      </div>
+
       <p className="text-sm text-muted-foreground">
-        Show this to the picker when they arrive. Do not share the token digitally.
+        Show this to the picker. They will scan it to link your account before verifying your items.
       </p>
-      {token && (
-        <div className="bg-white p-4 rounded-xl inline-block mx-auto">
-          <QRCodeSVG
-            value={qrValue}
-            size={200}
-            bgColor="#ffffff"
-            fgColor="#000000"
-            level="H"
-            includeMargin
-          />
-        </div>
-      )}
-      <div className="flex justify-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={() => pickupId ? generateToken(pickupId) : setToken(null)}
-          disabled={loading}
-        >
-          <RefreshCw className="h-4 w-4" /> Regenerate
-        </Button>
+
+      <div className="bg-white p-4 rounded-xl inline-block mx-auto">
+        <QRCodeSVG
+          value={qrValue}
+          size={200}
+          bgColor="#ffffff"
+          fgColor="#000000"
+          level="H"
+        />
       </div>
+
+      <div className="rounded-lg bg-muted/50 px-4 py-2 text-xs text-muted-foreground space-y-0.5">
+        <p><span className="font-medium">Name:</span> {data.name}</p>
+        <p><span className="font-medium">ID:</span> {data.userId.slice(0, 16)}…</p>
+      </div>
+
       <p className="text-xs text-muted-foreground">
-        Token refreshes on each regeneration. Old tokens are invalidated automatically.
+        Balance updates automatically after each verified transaction.
       </p>
     </Card>
   );

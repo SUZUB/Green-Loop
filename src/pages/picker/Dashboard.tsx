@@ -36,6 +36,7 @@ import {
   BarChart3,
   Timer,
   ScanLine,
+  QrCode,
 } from "lucide-react";
 
 interface Pickup {
@@ -56,26 +57,12 @@ interface Pickup {
   destLng?: number;
 }
 
-const weeklyPickups: Pickup[] = [
-  { id: 1, recycler: "Ananya Sharma", date: "Mar 8", time: "Morning", weight: "2.5 kg", address: "HSR Layout, Bangalore", status: "pending", phone: "+91 98765 43210", vehicleType: "bike", isPrePickup: true, etaMinutes: 23, gpsLat: 12.9120, gpsLng: 77.6300, destLat: 12.9141, destLng: 77.6368 },
-  { id: 2, recycler: "Ravi Kumar", date: "Mar 8", time: "Afternoon", weight: "1.8 kg", address: "Koramangala, Bangalore", status: "pending", phone: "+91 87654 32109", vehicleType: "auto", isPrePickup: false },
-  { id: 3, recycler: "Priya Nair", date: "Mar 9", time: "Morning", weight: "4.0 kg", address: "Indiranagar, Bangalore", status: "pending", phone: "+91 76543 21098", vehicleType: "van", isPrePickup: false },
-  { id: 4, recycler: "Amit Patel", date: "Mar 7", time: "Evening", weight: "3.2 kg", address: "Whitefield, Bangalore", status: "completed", phone: "+91 65432 10987", vehicleType: "bike", isPrePickup: false },
-  { id: 5, recycler: "Sara Khan", date: "Mar 6", time: "Morning", weight: "1.5 kg", address: "JP Nagar, Bangalore", status: "completed", phone: "+91 54321 09876", vehicleType: "auto", isPrePickup: false },
-  { id: 6, recycler: "Deepak Reddy", date: "Mar 5", time: "Afternoon", weight: "2.0 kg", address: "BTM Layout, Bangalore", status: "cancelled", phone: "+91 43210 98765", vehicleType: "van", isPrePickup: false },
-];
-
-const performanceStats = [
-  { icon: Package, label: "Pickups This Week", value: "8", color: "text-primary" },
-  { icon: Weight, label: "Weight Collected", value: "15 kg", color: "text-ocean" },
-  { icon: TrendingUp, label: "Earnings", value: "₹150", color: "text-leaf" },
-  { icon: Star, label: "Rating", value: "4.8 ★", color: "text-earth" },
-];
+// weeklyPickups is now loaded from DB in the Dashboard component (see dbPickups state)
 
 const statusConfig = {
-  pending: { icon: Loader2, label: "Pending", variant: "outline" as const, className: "border-warning text-warning" },
+  pending:   { icon: Loader2,      label: "Pending",   variant: "outline" as const, className: "border-warning text-warning" },
   completed: { icon: CheckCircle2, label: "Completed", variant: "outline" as const, className: "border-primary text-primary" },
-  cancelled: { icon: XCircle, label: "Cancelled", variant: "outline" as const, className: "border-destructive text-destructive" },
+  cancelled: { icon: XCircle,      label: "Cancelled", variant: "outline" as const, className: "border-destructive text-destructive" },
 };
 
 const vehicleIcons = { bike: Bike, auto: Truck, van: Car };
@@ -111,6 +98,14 @@ const Dashboard = () => {
     total_pickups: number; total_recycled_kg: number; created_at: string;
   } | null>(null);
 
+  // DB-driven pickups (ASSIGNED to this picker) and performance stats
+  const [dbPickups, setDbPickups] = useState<Pickup[]>([]);
+  const [dbStats, setDbStats] = useState({
+    pickupsThisWeek: 0,
+    weightCollected: 0,
+    earnings: 0,
+  });
+
   useEffect(() => {
     async function loadProfile() {
       const { data: auth } = await supabase.auth.getUser();
@@ -121,6 +116,43 @@ const Dashboard = () => {
         .eq("id", user.id).maybeSingle();
       if (data) {
         setDbProfile({ ...(data as any), email: user.email ?? "" });
+        setDbStats((prev) => ({
+          ...prev,
+          weightCollected: (data as any).total_recycled_kg ?? 0,
+          earnings: Math.floor(((data as any).coin_balance ?? 0) / 10),
+        }));
+      }
+
+      // Load assigned pickups from DB
+      const { data: pickupRows } = await supabase
+        .from("pickups")
+        .select(`id, address, weight_kg, status, created_at, recycler_id,
+          profiles!pickups_recycler_id_fkey(full_name)`)
+        .eq("picker_id", user.id)
+        .in("status", ["ASSIGNED", "COMPLETED"])
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (pickupRows) {
+        const mapped: Pickup[] = (pickupRows as any[]).map((r, i) => ({
+          id: i + 1,
+          recycler: r.profiles?.full_name ?? "Recycler",
+          date: new Date(r.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric" }),
+          time: "Scheduled",
+          weight: `${r.weight_kg} kg`,
+          address: r.address || "Address on file",
+          status: r.status === "ASSIGNED" ? "pending" : "completed",
+          phone: "",
+          vehicleType: "bike" as const,
+          isPrePickup: false,
+        }));
+        setDbPickups(mapped);
+
+        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const thisWeek = (pickupRows as any[]).filter(
+          (r) => new Date(r.created_at).getTime() > weekAgo && r.status === "COMPLETED"
+        );
+        setDbStats((prev) => ({ ...prev, pickupsThisWeek: thisWeek.length }));
       }
     }
     loadProfile();
@@ -153,8 +185,15 @@ const Dashboard = () => {
     }
   }, [bottomTab]);
 
-  const pending = weeklyPickups.filter((p) => p.status === "pending");
-  const completed = weeklyPickups.filter((p) => p.status === "completed");
+  const pending = dbPickups.filter((p) => p.status === "pending");
+  const completed = dbPickups.filter((p) => p.status === "completed");
+
+  const performanceStats = [
+    { icon: Package,    label: "Pickups This Week",  value: String(dbStats.pickupsThisWeek),              color: "text-primary" },
+    { icon: Weight,     label: "Weight Collected",   value: `${dbStats.weightCollected.toFixed(1)} kg`,   color: "text-ocean" },
+    { icon: TrendingUp, label: "Earnings",           value: `₹${dbStats.earnings}`,                       color: "text-leaf" },
+    { icon: Star,       label: "Total Pickups",      value: String(dbProfile?.total_pickups ?? 0),        color: "text-earth" },
+  ];
 
   return (
     <div className="min-h-screen bg-background/40">
@@ -191,22 +230,38 @@ const Dashboard = () => {
                   <PickerMapTracker role="recycler" title="Recycler activity heatmap" />
                 </div>
 
-                {/* Scan QR Button */}
-                <Button
-                  className="w-full mb-4 gap-2 h-12 text-base"
-                  onClick={() => setShowScanner(true)}
-                >
-                  <ScanLine className="h-5 w-5" />
-                  Scan Recycler QR Code
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="w-full mb-4 gap-2 h-12 text-base border-primary/30"
-                  onClick={() => navigate("/picker/ai-camera")}
-                >
-                  <ScanLine className="h-5 w-5" />
-                  AI Plastic Scanner
-                </Button>
+                {/* ── Two Camera System ── */}
+                <div className="grid grid-cols-2 gap-3 mb-5">
+                  {/* Camera 1 — QR Scanner */}
+                  <button
+                    onClick={() => setShowScanner(true)}
+                    className="flex flex-col items-center gap-2 rounded-2xl border-2 border-emerald-500/40 bg-emerald-950/60 backdrop-blur p-4 text-center hover:border-emerald-400 hover:bg-emerald-900/70 transition-all active:scale-95"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                      <QrCode className="h-6 w-6 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Camera 1</p>
+                      <p className="text-sm font-semibold text-white mt-0.5">QR Scanner</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Scan recycler QR code</p>
+                    </div>
+                  </button>
+
+                  {/* Camera 2 — Item Recognition */}
+                  <button
+                    onClick={() => navigate("/picker/ai-camera")}
+                    className="flex flex-col items-center gap-2 rounded-2xl border-2 border-cyan-500/40 bg-cyan-950/60 backdrop-blur p-4 text-center hover:border-cyan-400 hover:bg-cyan-900/70 transition-all active:scale-95"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                      <ScanLine className="h-6 w-6 text-cyan-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-cyan-300 uppercase tracking-wider">Camera 2</p>
+                      <p className="text-sm font-semibold text-white mt-0.5">Item Recognition</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Identify items &amp; pay</p>
+                    </div>
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-3 mb-6">
                   {performanceStats.map((stat, i) => (
                     <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
@@ -242,7 +297,7 @@ const Dashboard = () => {
                   </TabsContent>
 
                   <TabsContent value="history" className="mt-4 space-y-3">
-                    {weeklyPickups
+                    {dbPickups
                       .filter((p) => p.status !== "pending")
                       .map((pickup, i) => (
                         <motion.div key={pickup.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}>
@@ -259,7 +314,7 @@ const Dashboard = () => {
         {bottomTab === "schedule" && (
           <div className="space-y-3">
             <h2 className="text-lg font-display font-bold mb-4">Weekly Schedule</h2>
-            {weeklyPickups.map((pickup, i) => (
+            {dbPickups.map((pickup, i) => (
               <motion.div key={pickup.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                 <PickupCard pickup={pickup} onTrack={pickup.isPrePickup && pickup.status === "pending" ? () => setSelectedPickup(pickup) : undefined} />
               </motion.div>
@@ -288,8 +343,8 @@ const Dashboard = () => {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><p className="text-muted-foreground">Completed</p><p className="font-bold text-lg">{completed.length}</p></div>
                 <div><p className="text-muted-foreground">Pending</p><p className="font-bold text-lg">{pending.length}</p></div>
-                <div><p className="text-muted-foreground">Total Weight</p><p className="font-bold text-lg">15 kg</p></div>
-                <div><p className="text-muted-foreground">Avg Rating</p><p className="font-bold text-lg">4.8 ★</p></div>
+                <div><p className="text-muted-foreground">Total Weight</p><p className="font-bold text-lg">{dbStats.weightCollected.toFixed(1)} kg</p></div>
+                <div><p className="text-muted-foreground">Total Pickups</p><p className="font-bold text-lg">{dbProfile?.total_pickups ?? 0}</p></div>
               </div>
             </Card>
           </div>

@@ -15,7 +15,7 @@ const buyerNav: NavItem[] = [
 
 const pickerNav: NavItem[] = [
   { id: "map", label: "Dashboard", icon: MapPin, path: "/picker/dashboard" },
-  { id: "aiCamera", label: "AI Scanner", icon: ScanLine, path: "/picker/ai-camera" },
+  { id: "aiCamera", label: "Camera 2: Items", icon: ScanLine, path: "/picker/ai-camera" },
   { id: "profile", label: "Profile", icon: User, path: "/picker/profile" },
 ];
 

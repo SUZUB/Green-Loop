@@ -132,6 +132,7 @@
 
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageBackground } from "@/components/PageBackground";
 import { useNavigate } from "react-router-dom";
@@ -157,11 +158,8 @@ const quickActions = [
   { icon: BarChart3, label: "Analytics", path: "/buyer/analytics", color: "bg-leaf" },
 ];
 
-const recentOrders = [
-  { id: "ORD-001", supplier: "ABC Recyclers", type: "PET", qty: "500 kg", status: "In Transit", statusColor: "text-ocean" },
-  { id: "ORD-002", supplier: "XYZ Plastics", type: "HDPE", qty: "1,000 kg", status: "Processing", statusColor: "text-warning" },
-  { id: "ORD-003", supplier: "Eco Solutions", type: "PET", qty: "300 kg", status: "Delivered", statusColor: "text-primary" },
-];
+const recentOrders: { id: string; supplier: string; type: string; qty: string; status: string; statusColor: string }[] = [];
+// Recent orders are loaded from pickup_transactions in the BuyerDashboard component
 
 const BuyerDashboard = () => {
   const navigate = useNavigate();
@@ -174,6 +172,33 @@ const BuyerDashboard = () => {
       return true;
     }
   });
+
+  // Load recent orders from DB
+  const [dbOrders, setDbOrders] = useState<{ id: string; supplier: string; type: string; qty: string; status: string; statusColor: string }[]>([]);
+
+  useEffect(() => {
+    async function loadOrders() {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data } = await supabase
+        .from("pickup_transactions")
+        .select("id, recycler_id, weight_kg, plastic_type, created_at, profiles!pickup_transactions_recycler_id_fkey(full_name)")
+        .eq("picker_id", auth.user.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (data) {
+        setDbOrders((data as any[]).map((r) => ({
+          id: r.id.slice(0, 8).toUpperCase(),
+          supplier: r.profiles?.full_name ?? "Recycler",
+          type: r.plastic_type ?? "Mixed",
+          qty: `${r.weight_kg} kg`,
+          status: "Completed",
+          statusColor: "text-primary",
+        })));
+      }
+    }
+    loadOrders();
+  }, []);
 
   useEffect(() => {
     try {
@@ -333,15 +358,19 @@ const BuyerDashboard = () => {
           </Button>
         </div>
         <div className="space-y-3 mb-4">
-          {recentOrders.map((order) => (
-            <Card key={order.id} className="p-4">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-medium text-sm">{order.id}</span>
-                <span className={`text-xs font-semibold ${order.statusColor}`}>{order.status}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">{order.supplier} · {order.type} · {order.qty}</p>
-            </Card>
-          ))}
+          {dbOrders.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No transactions yet.</p>
+          ) : (
+            dbOrders.map((order) => (
+              <Card key={order.id} className="p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-sm">{order.id}</span>
+                  <span className={`text-xs font-semibold ${order.statusColor}`}>{order.status}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{order.supplier} · {order.type} · {order.qty}</p>
+              </Card>
+            ))
+          )}
         </div>
       </div>
 

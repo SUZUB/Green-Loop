@@ -97,13 +97,13 @@ const UI: Record<
   }
 > = {
   en: {
-    title: "AI Plastic Scanner",
-    subtitle: "Live camera or upload — optimized for pickers on GREEN LOOP.",
-    liveCamera: "Live camera",
+    title: "Camera 2 — Item Recognition",
+    subtitle: "Present items to Camera 2 for AI identification and payment processing.",
+    liveCamera: "Start Camera 2",
     upload: "Upload image",
     capture: "Capture",
     retake: "Retake",
-    analyze: "Analyze",
+    analyze: "Identify Items",
     batch: "Batch mode",
     readAloud: "Read results",
     share: "Share summary",
@@ -112,13 +112,13 @@ const UI: Record<
     moveCloser: "Move closer",
   },
   hi: {
-    title: "AI प्लास्टिक स्कैनर",
-    subtitle: "लाइव कैमरा या अपलोड — GREEN LOOP पिकर्स के लिए।",
-    liveCamera: "लाइव कैमरा",
+    title: "कैमरा 2 — आइटम पहचान",
+    subtitle: "कैमरा 2 के सामने आइटम रखें — AI पहचान और भुगतान।",
+    liveCamera: "कैमरा 2 शुरू करें",
     upload: "छवि अपलोड",
     capture: "कैप्चर",
     retake: "फिर से लें",
-    analyze: "विश्लेषण",
+    analyze: "आइटम पहचानें",
     batch: "बैच मोड",
     readAloud: "पढ़कर सुनाएं",
     share: "साझा करें",
@@ -127,13 +127,13 @@ const UI: Record<
     moveCloser: "करीब लाएं",
   },
   es: {
-    title: "Escáner AI de plástico",
-    subtitle: "Cámara en vivo o subida — para recolectores en GREEN LOOP.",
-    liveCamera: "Cámara en vivo",
+    title: "Cámara 2 — Reconocimiento de artículos",
+    subtitle: "Presenta artículos a Cámara 2 para identificación AI y procesamiento de pago.",
+    liveCamera: "Iniciar Cámara 2",
     upload: "Subir imagen",
     capture: "Capturar",
     retake: "Repetir",
-    analyze: "Analizar",
+    analyze: "Identificar artículos",
     batch: "Modo lote",
     readAloud: "Leer en voz alta",
     share: "Compartir",
@@ -292,19 +292,22 @@ function PaymentConfirmationPanel({
     >
       <div className="flex items-center gap-2">
         <Coins className="h-5 w-5 text-emerald-600" />
-        <p className="font-semibold text-emerald-800">Confirm Payment</p>
+        <p className="font-semibold text-emerald-800">Camera 2 — Items Detected</p>
       </div>
 
+      {/* Line-item breakdown from Camera 2 */}
       <div className="space-y-2 text-sm">
-        {preview.items.map((it, i) => (
+        {(preview.lineItems ?? []).map((li, i) => (
           <div key={i} className="flex justify-between items-center rounded-lg bg-white border px-3 py-2">
-            <div>
-              <span className="font-medium">{it.plasticType}</span>
-              <span className="text-muted-foreground ml-2">
-                ~{(it.weightKg * 1000).toFixed(0)} g
+            <div className="flex-1 min-w-0">
+              <span className="font-medium truncate block">{li.displayType}</span>
+              <span className="text-muted-foreground text-xs">
+                {li.creditUnit === "each"
+                  ? `${li.count} item${li.count !== 1 ? "s" : ""} × ${li.creditsPerUnit} credits`
+                  : `${(li.weightKg * 1000).toFixed(0)} g × ${li.creditsPerUnit} credits/kg`}
               </span>
             </div>
-            <Badge className="bg-emerald-600">{it.coins} coins</Badge>
+            <Badge className="bg-emerald-600 shrink-0 ml-2">{li.totalCredits} cr</Badge>
           </div>
         ))}
       </div>
@@ -315,8 +318,8 @@ function PaymentConfirmationPanel({
       </div>
 
       <div className="rounded-lg bg-emerald-100 border border-emerald-200 px-3 py-2 flex justify-between items-center">
-        <span className="font-semibold text-emerald-800">Total reward</span>
-        <span className="text-xl font-bold text-emerald-700">{preview.totalCoins} coins</span>
+        <span className="font-semibold text-emerald-800">Total credits</span>
+        <span className="text-xl font-bold text-emerald-700">{preview.totalCoins} credits</span>
       </div>
 
       <div className="flex gap-2">
@@ -329,7 +332,7 @@ function PaymentConfirmationPanel({
           {isSubmitting ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> Processing…</>
           ) : (
-            <><CheckCircle className="h-4 w-4" /> Confirm & Earn</>
+            <><CheckCircle className="h-4 w-4" /> Confirm & Credit Recycler</>
           )}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
@@ -342,10 +345,12 @@ function PaymentConfirmationPanel({
 
 function PaymentReceiptPanel({
   receipt,
+  recyclerName,
   onScanAnother,
   onViewHistory,
 }: {
   receipt: PaymentReceipt;
+  recyclerName: string;
   onScanAnother: () => void;
   onViewHistory: () => void;
 }) {
@@ -357,36 +362,61 @@ function PaymentReceiptPanel({
     >
       <div className="flex items-center gap-2">
         <Receipt className="h-5 w-5 text-emerald-600" />
-        <p className="font-semibold text-emerald-800">Payment Receipt</p>
+        <p className="font-semibold text-emerald-800">Transaction Receipt</p>
       </div>
 
-      <div className="space-y-2 text-sm">
+      {/* Recycler info */}
+      <div className="rounded-lg bg-white border px-3 py-2 space-y-1 text-sm">
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Transaction ID</span>
-          <span className="font-mono text-xs truncate max-w-[160px]">{receipt.transactionId}</span>
+          <span className="text-muted-foreground">Recycler Name</span>
+          <span className="font-semibold">{recyclerName}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Recycler account</span>
-          <span className="font-medium">{receipt.recyclerUserId.slice(0, 8)}…</span>
+          <span className="text-muted-foreground">Recycler ID</span>
+          <span className="font-mono text-xs">{receipt.recyclerUserId.slice(0, 12)}…</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Plastic type(s)</span>
-          <span>{receipt.plasticTypes.join(", ")}</span>
+          <span className="text-muted-foreground">Previous Balance</span>
+          <span>{receipt.previousBalance} credits</span>
+        </div>
+      </div>
+
+      {/* Items detected by Camera 2 */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Items Detected by Camera 2</p>
+        <div className="space-y-1">
+          {(receipt.lineItems ?? []).map((li, i) => (
+            <div key={i} className="flex justify-between text-sm rounded bg-white border px-3 py-1.5">
+              <span>{li.displayType}
+                <span className="text-muted-foreground ml-1 text-xs">
+                  ({li.creditUnit === "each" ? `×${li.count}` : `${(li.weightKg * 1000).toFixed(0)}g`})
+                </span>
+              </span>
+              <span className="font-medium text-emerald-700">+{li.totalCredits}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="rounded-lg bg-emerald-100 border border-emerald-200 px-3 py-2 space-y-1 text-sm">
+        <div className="flex justify-between font-semibold">
+          <span className="text-emerald-800">Credits Earned</span>
+          <span className="text-emerald-700 text-lg">+{receipt.coinsEarned}</span>
+        </div>
+        <div className="flex justify-between font-bold">
+          <span className="text-emerald-800">New Balance</span>
+          <span className="text-emerald-700">{receipt.recyclerNewBalance} credits</span>
+        </div>
+      </div>
+
+      <div className="space-y-1 text-xs text-muted-foreground">
+        <div className="flex justify-between">
+          <span>Transaction ID</span>
+          <span className="font-mono">{receipt.transactionId.slice(0, 12)}…</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Weight</span>
-          <span>{receipt.weightKg.toFixed(3)} kg</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Credits earned</span>
-          <span className="font-bold text-emerald-700">+{receipt.coinsEarned}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Recycler new balance</span>
-          <span className="font-bold">{receipt.recyclerNewBalance} coins</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Time</span>
+          <span>Timestamp</span>
           <span>{new Date(receipt.timestamp).toLocaleString()}</span>
         </div>
       </div>
@@ -542,6 +572,12 @@ export default function PickerAICamera() {
               setRecyclerInfo({ userId: payload.id, name: (profile as any).full_name || "Recycler" });
               setQrScannerOpen(false);
               setQrScanError("");
+              // Log Camera 1 QR scan to database
+              supabase.rpc("log_qr_scan", {
+                p_qr_code: payload.id,
+                p_recycler_id: payload.id,
+                p_scan_status: "success",
+              }).catch(() => {});
             } catch {
               setQrScanError("Could not read QR code. Try again.");
             }
@@ -835,7 +871,7 @@ export default function PickerAICamera() {
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-emerald-400" />
                 <div>
-                  <p className="text-xs text-emerald-300 font-medium">Recycler linked</p>
+                  <p className="text-xs text-emerald-300 font-medium">Camera 2 ✓ — Recycler linked</p>
                   <p className="text-sm font-semibold text-white">{recyclerInfo.name}</p>
                 </div>
               </div>
@@ -853,7 +889,7 @@ export default function PickerAICamera() {
             <div className="rounded-xl bg-amber-900/80 border border-amber-500/30 px-4 py-3 space-y-3">
               <div className="flex items-center gap-2">
                 <QrCode className="h-4 w-4 text-amber-400" />
-                <p className="text-sm font-semibold text-amber-200">Scan Recycler QR first</p>
+                <p className="text-sm font-semibold text-amber-200">Camera 2 — Scan Recycler QR first</p>
               </div>
               <p className="text-xs text-amber-300/80">
                 Ask the recycler to show their GREEN LOOP QR code. Credits will be added to their account after item verification.
@@ -926,7 +962,7 @@ export default function PickerAICamera() {
                         <p className="text-sm text-amber-300">Scan the recycler's QR code above before scanning items.</p>
                       ) : (
                         <>
-                          <p className="text-sm mb-4">Start the camera for a live preview, or upload a photo.</p>
+                          <p className="text-sm mb-4">Camera 2 — Present items for AI identification.</p>
                           <div className="flex flex-wrap gap-2 justify-center">
                             <Button type="button" onClick={() => void startCamera()} className="gap-2">
                               <Camera className="h-4 w-4" /> {t.liveCamera}
@@ -1074,6 +1110,7 @@ export default function PickerAICamera() {
                     {paymentState === "receipt" && paymentReceipt && (
                       <PaymentReceiptPanel
                         receipt={paymentReceipt}
+                        recyclerName={recyclerInfo?.name ?? "Recycler"}
                         onScanAnother={() => { resetCapture(); void startCamera(); }}
                         onViewHistory={() => navigate("/picker/profile")}
                       />

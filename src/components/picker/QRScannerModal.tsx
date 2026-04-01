@@ -130,7 +130,7 @@ export function QRScannerModal({ open, onClose, onSuccess }: Props) {
               <motion.div key="scan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Camera className="h-5 w-5 text-primary" />
-                  <h3 className="font-display font-bold text-lg">Scan Recycler QR</h3>
+                  <h3 className="font-display font-bold text-lg">Camera 1 — QR Scanner</h3>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Point your camera at the recycler's pickup verification QR code.

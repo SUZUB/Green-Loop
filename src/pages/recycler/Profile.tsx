@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { QRCodeDisplay } from "@/components/recycler/QRCodeDisplay";
 import {
-  User, MapPin, Phone, Mail, Star, CalendarDays, Weight,
+  User, Mail, Star, CalendarDays, Weight,
   Download, Search, CheckCircle2, XCircle, Loader2,
 } from "lucide-react";
 
@@ -34,7 +35,7 @@ interface PickupRow {
 
 const RecyclerProfile = () => {
   const { toast } = useToast();
-  const [tab, setTab] = useState("history");
+  const [tab, setTab] = useState("qr");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
@@ -161,10 +162,16 @@ const RecyclerProfile = () => {
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="w-full mb-4">
+            <TabsTrigger value="qr" className="flex-1">My QR</TabsTrigger>
             <TabsTrigger value="history" className="flex-1">History</TabsTrigger>
             <TabsTrigger value="feedback" className="flex-1">Feedback</TabsTrigger>
             <TabsTrigger value="settings" className="flex-1">Settings</TabsTrigger>
           </TabsList>
+
+          {/* QR Code */}
+          <TabsContent value="qr">
+            <QRCodeDisplay />
+          </TabsContent>
 
           {/* History */}
           <TabsContent value="history">

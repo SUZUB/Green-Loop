@@ -47,6 +47,183 @@ export type Database = {
         }
         Relationships: []
       }
+      item_types: {
+        Row: {
+          id: string
+          item_name: string
+          item_category: string
+          display_label: string
+          credits_per_unit: number
+          unit_type: string
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          item_name: string
+          item_category: string
+          display_label: string
+          credits_per_unit?: number
+          unit_type?: string
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          item_name?: string
+          item_category?: string
+          display_label?: string
+          credits_per_unit?: number
+          unit_type?: string
+          is_active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      transaction_items: {
+        Row: {
+          id: string
+          transaction_id: string
+          item_type_id: string | null
+          item_name: string
+          quantity: number
+          weight_kg: number
+          credits_per_unit: number
+          credits_earned: number
+          item_condition: string
+          is_rejected: boolean
+          rejection_reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          transaction_id: string
+          item_type_id?: string | null
+          item_name: string
+          quantity?: number
+          weight_kg?: number
+          credits_per_unit?: number
+          credits_earned?: number
+          item_condition?: string
+          is_rejected?: boolean
+          rejection_reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          transaction_id?: string
+          item_type_id?: string | null
+          item_name?: string
+          quantity?: number
+          weight_kg?: number
+          credits_per_unit?: number
+          credits_earned?: number
+          item_condition?: string
+          is_rejected?: boolean
+          rejection_reason?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      credit_history: {
+        Row: {
+          id: string
+          recycler_id: string
+          transaction_id: string | null
+          credit_type: string
+          amount: number
+          balance_before: number
+          balance_after: number
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          recycler_id: string
+          transaction_id?: string | null
+          credit_type?: string
+          amount: number
+          balance_before: number
+          balance_after: number
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          recycler_id?: string
+          transaction_id?: string | null
+          credit_type?: string
+          amount?: number
+          balance_before?: number
+          balance_after?: number
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      qr_code_scans: {
+        Row: {
+          id: string
+          qr_code: string
+          recycler_id: string | null
+          picker_id: string | null
+          scan_status: string
+          error_message: string | null
+          scan_timestamp: string
+        }
+        Insert: {
+          id?: string
+          qr_code: string
+          recycler_id?: string | null
+          picker_id?: string | null
+          scan_status?: string
+          error_message?: string | null
+          scan_timestamp?: string
+        }
+        Update: {
+          id?: string
+          qr_code?: string
+          recycler_id?: string | null
+          picker_id?: string | null
+          scan_status?: string
+          error_message?: string | null
+          scan_timestamp?: string
+        }
+        Relationships: []
+      }
+      camera_logs: {
+        Row: {
+          id: string
+          camera_type: string
+          picker_id: string | null
+          action_type: string
+          items_detected: Json | null
+          scan_result: string | null
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          camera_type: string
+          picker_id?: string | null
+          action_type: string
+          items_detected?: Json | null
+          scan_result?: string | null
+          error_message?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          camera_type?: string
+          picker_id?: string | null
+          action_type?: string
+          items_detected?: Json | null
+          scan_result?: string | null
+          error_message?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       pickups: {
         Row: {
           id: string
@@ -111,6 +288,14 @@ export type Database = {
           total_points: number
           total_recycled_kg: number
           updated_at: string
+          phone_number: string | null
+          address: string | null
+          city: string | null
+          state: string | null
+          postal_code: string | null
+          picker_code: string | null
+          is_active: boolean
+          last_login: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -127,6 +312,14 @@ export type Database = {
           total_points?: number
           total_recycled_kg?: number
           updated_at?: string
+          phone_number?: string | null
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          postal_code?: string | null
+          picker_code?: string | null
+          is_active?: boolean
+          last_login?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -143,6 +336,14 @@ export type Database = {
           total_points?: number
           total_recycled_kg?: number
           updated_at?: string
+          phone_number?: string | null
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          postal_code?: string | null
+          picker_code?: string | null
+          is_active?: boolean
+          last_login?: string | null
         }
         Relationships: []
       }
@@ -222,12 +423,22 @@ export type Database = {
       process_scan_payment: {
         Args: {
           p_scan_id: string
+          p_recycler_id: string
           p_plastic_type: string
           p_weight_kg: number
           p_coins_earned: number
           p_scan_metadata?: Json
         }
         Returns: Json
+      }
+      log_qr_scan: {
+        Args: {
+          p_qr_code: string
+          p_recycler_id: string
+          p_scan_status?: string
+          p_error?: string
+        }
+        Returns: void
       }
       record_pickup: {
         Args: {

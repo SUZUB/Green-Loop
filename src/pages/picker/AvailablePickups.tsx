@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { PageBackground } from "@/components/PageBackground";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAvailablePickups } from "@/hooks/useAvailablePickups";
 import { useToast } from "@/hooks/use-toast";
-import { QRScannerModal } from "@/components/picker/QRScannerModal";
 import {
   MapPin, Weight, RefreshCw, Navigation, Loader2, Package, ScanLine,
 } from "lucide-react";
@@ -20,7 +20,7 @@ function openMaps(lat: number, lng: number) {
 }
 
 export default function AvailablePickups() {
-  const [scannerOpen, setScannerOpen] = useState(false);
+  const navigate = useNavigate();
   const [acceptedId, setAcceptedId] = useState<string | null>(null);
   const { toast } = useToast();
   const { pickups, loading, accepting, error, accept, refresh } = useAvailablePickups();
@@ -149,33 +149,21 @@ export default function AvailablePickups() {
               <div>
                 <p className="font-semibold text-primary-foreground text-sm">Pickup accepted</p>
                 <p className="text-primary-foreground/80 text-xs">
-                  Arrive at the recycler, collect items, then scan their QR to confirm receipt and release payment.
+                  Arrive at the recycler → use Camera 1 to scan their QR → use Camera 2 to identify items and process payment.
                 </p>
               </div>
               <Button
                 size="sm"
                 variant="secondary"
                 className="gap-2 shrink-0"
-                onClick={() => setScannerOpen(true)}
+                onClick={() => navigate("/picker/ai-camera")}
               >
-                <ScanLine className="h-4 w-4" /> Scan QR
+                <ScanLine className="h-4 w-4" /> Camera 2: Scan Items
               </Button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      <QRScannerModal
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onSuccess={(result) => {
-          setAcceptedId(null);
-          toast({
-            title: "Receipt confirmed ✓",
-            description: `${result.weight_kg} kg received. ${result.points} points credited to your wallet.`,
-          });
-        }}
-      />
     </div>
   );
 }

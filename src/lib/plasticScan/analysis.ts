@@ -1,15 +1,31 @@
-/**
- * Client-side image metrics and heuristic plastic classification for GREEN LOOP picker scans.
- * Optional server vision: set VITE_PLASTIC_VISION_URL to POST multipart image for JSON override.
- */
-
 export type LangCode = "en" | "hi" | "es";
 
+// All material categories Camera 2 can detect
+export type MaterialKind =
+  | "PET_BOTTLE"
+  | "HDPE_BOTTLE"
+  | "METAL_CAN_ALUMINUM"
+  | "METAL_CAN_STEEL"
+  | "GLASS_BOTTLE_CLEAR"
+  | "GLASS_BOTTLE_COLORED"
+  | "CARDBOARD"
+  | "PAPER"
+  | "TETRA_PACK"
+  | "PLASTIC_OTHER"
+  | "NON_RECYCLABLE";
+
+// Legacy alias kept for backward compat with paymentEngine / tests
 export type PlasticKind = "PET" | "HDPE" | "PVC" | "LDPE" | "PP" | "PS" | "Other";
+
 export type ConditionKind = "clean" | "dirty" | "damaged" | "crushed";
 export type RecyclabilityLevel = "high" | "moderate" | "low";
 
+// Credit unit: "each" = per item, "kg" = per kilogram
+export type CreditUnit = "each" | "kg";
+
 export type DetectedItem = {
+  materialKind: MaterialKind;
+  // Legacy field — mapped from materialKind for backward compat
   plasticType: PlasticKind;
   displayType: string;
   confidence: number;
@@ -17,6 +33,10 @@ export type DetectedItem = {
   contamination: string[];
   brandHint: string | null;
   weightEstimateGrams: [number, number];
+  // How many individual items (for "each" rated materials)
+  countEstimate: number;
+  creditUnit: CreditUnit;
+  creditsPerUnit: number;
 };
 
 export type ScanAnalysis = {
@@ -35,15 +55,131 @@ export type ScanAnalysis = {
   uncertainAlternative: string | null;
 };
 
-const PLASTIC_LABELS: Record<PlasticKind, string> = {
-  PET: "PET (#1)",
-  HDPE: "HDPE (#2)",
-  PVC: "PVC (#3)",
-  LDPE: "LDPE (#4)",
-  PP: "PP (#5)",
-  PS: "PS (#6)",
-  Other: "Other / mixed plastic",
+// ── Material metadata ────────────────────────────────────────────────────────
+
+interface MaterialMeta {
+  displayType: string;
+  recyclability: RecyclabilityLevel;
+  binColorKey: ScanAnalysis["binColorKey"];
+  binColorLabel: string;
+  creditUnit: CreditUnit;
+  creditsPerUnit: number;
+  // Legacy plastic type mapping
+  plasticType: PlasticKind;
+}
+
+const MATERIAL_META: Record<MaterialKind, MaterialMeta> = {
+  PET_BOTTLE: {
+    displayType: "Plastic Bottle (PET #1)",
+    recyclability: "high",
+    binColorKey: "blue",
+    binColorLabel: "Blue bin — rigid plastics",
+    creditUnit: "each",
+    creditsPerUnit: 2,
+    plasticType: "PET",
+  },
+  HDPE_BOTTLE: {
+    displayType: "Plastic Bottle (HDPE #2)",
+    recyclability: "high",
+    binColorKey: "blue",
+    binColorLabel: "Blue bin — rigid plastics",
+    creditUnit: "each",
+    creditsPerUnit: 2,
+    plasticType: "HDPE",
+  },
+  METAL_CAN_ALUMINUM: {
+    displayType: "Aluminum Can",
+    recyclability: "high",
+    binColorKey: "blue",
+    binColorLabel: "Blue bin — metals",
+    creditUnit: "each",
+    creditsPerUnit: 3,
+    plasticType: "Other",
+  },
+  METAL_CAN_STEEL: {
+    displayType: "Steel Can",
+    recyclability: "high",
+    binColorKey: "blue",
+    binColorLabel: "Blue bin — metals",
+    creditUnit: "each",
+    creditsPerUnit: 3,
+    plasticType: "Other",
+  },
+  GLASS_BOTTLE_CLEAR: {
+    displayType: "Glass Bottle (Clear)",
+    recyclability: "high",
+    binColorKey: "green",
+    binColorLabel: "Green bin — glass",
+    creditUnit: "each",
+    creditsPerUnit: 2,
+    plasticType: "Other",
+  },
+  GLASS_BOTTLE_COLORED: {
+    displayType: "Glass Bottle (Colored)",
+    recyclability: "moderate",
+    binColorKey: "green",
+    binColorLabel: "Green bin — glass",
+    creditUnit: "each",
+    creditsPerUnit: 2,
+    plasticType: "Other",
+  },
+  CARDBOARD: {
+    displayType: "Cardboard",
+    recyclability: "high",
+    binColorKey: "yellow",
+    binColorLabel: "Yellow bin — paper & cardboard",
+    creditUnit: "kg",
+    creditsPerUnit: 1,
+    plasticType: "Other",
+  },
+  PAPER: {
+    displayType: "Paper",
+    recyclability: "high",
+    binColorKey: "yellow",
+    binColorLabel: "Yellow bin — paper & cardboard",
+    creditUnit: "kg",
+    creditsPerUnit: 1,
+    plasticType: "Other",
+  },
+  TETRA_PACK: {
+    displayType: "Tetra Pack",
+    recyclability: "moderate",
+    binColorKey: "yellow",
+    binColorLabel: "Special collection — tetra packs",
+    creditUnit: "each",
+    creditsPerUnit: 1.5,
+    plasticType: "Other",
+  },
+  PLASTIC_OTHER: {
+    displayType: "Mixed / Other Plastic",
+    recyclability: "low",
+    binColorKey: "red",
+    binColorLabel: "Check local guidance — mixed plastics",
+    creditUnit: "kg",
+    creditsPerUnit: 0,
+    plasticType: "PS",
+  },
+  NON_RECYCLABLE: {
+    displayType: "Non-Recyclable",
+    recyclability: "low",
+    binColorKey: "red",
+    binColorLabel: "General waste — not recyclable",
+    creditUnit: "each",
+    creditsPerUnit: 0,
+    plasticType: "Other",
+  },
 };
+
+// All material kinds Camera 2 can detect (ordered by detection priority)
+const ALL_KINDS: MaterialKind[] = [
+  "PET_BOTTLE", "HDPE_BOTTLE",
+  "METAL_CAN_ALUMINUM", "METAL_CAN_STEEL",
+  "GLASS_BOTTLE_CLEAR", "GLASS_BOTTLE_COLORED",
+  "CARDBOARD", "PAPER", "TETRA_PACK",
+  "PLASTIC_OTHER",
+];
+
+// ── Image analysis helpers ───────────────────────────────────────────────────
 
 function hashImageSample(data: Uint8ClampedArray, step = 16): number {
   let h = 2166136261;
@@ -69,7 +205,6 @@ function downscaleToCanvas(img: CanvasImageSource, maxW = 360): HTMLCanvasElemen
   return c;
 }
 
-/** Laplacian variance proxy: higher = sharper */
 export function measureSharpnessAndBrightness(canvas: HTMLCanvasElement): {
   meanL: number;
   lapVar: number;
@@ -84,48 +219,33 @@ export function measureSharpnessAndBrightness(canvas: HTMLCanvasElement): {
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
-      const r = data[i] / 255;
-      const g = data[i + 1] / 255;
-      const b = data[i + 2] / 255;
-      const L = 0.299 * r + 0.587 * g + 0.114 * b;
-      const idx = y * width + x;
-      gray[idx] = L;
+      const L = 0.299 * (data[i] / 255) + 0.587 * (data[i + 1] / 255) + 0.114 * (data[i + 2] / 255);
+      gray[y * width + x] = L;
       sumL += L;
     }
   }
   const meanL = (sumL / n) * 255;
-  let lapSum = 0;
-  let lapSq = 0;
-  let edgeSum = 0;
-  let lapCount = 0;
+  let lapSq = 0, lapSum = 0, edgeSum = 0, lapCount = 0;
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const idx = y * width + x;
-      const lap =
-        -4 * gray[idx] +
-        gray[idx - 1] +
-        gray[idx + 1] +
-        gray[idx - width] +
-        gray[idx + width];
-      lapSum += lap;
-      lapSq += lap * lap;
-      lapCount++;
+      const lap = -4 * gray[idx] + gray[idx - 1] + gray[idx + 1] + gray[idx - width] + gray[idx + width];
+      lapSum += lap; lapSq += lap * lap; lapCount++;
       const gx = gray[idx + 1] - gray[idx - 1];
       const gy = gray[idx + width] - gray[idx - width];
       edgeSum += Math.sqrt(gx * gx + gy * gy);
     }
   }
   const meanLap = lapSum / lapCount;
-  const lapVar = lapSq / lapCount - meanLap * meanLap;
-  const edgeEnergy = edgeSum / lapCount;
-  return { meanL, lapVar: lapVar * 1e4, edgeEnergy: edgeEnergy * 255 };
+  return {
+    meanL,
+    lapVar: (lapSq / lapCount - meanLap * meanLap) * 1e4,
+    edgeEnergy: (edgeSum / lapCount) * 255,
+  };
 }
 
-const KINDS: PlasticKind[] = ["PET", "HDPE", "PVC", "LDPE", "PP", "PS", "Other"];
-
-function pickPlastic(seed: number, bias: number): PlasticKind {
-  const idx = (seed + Math.floor(bias * 7)) % KINDS.length;
-  return KINDS[idx]!;
+function pickMaterial(seed: number, bias: number): MaterialKind {
+  return ALL_KINDS[(seed + Math.floor(bias * ALL_KINDS.length)) % ALL_KINDS.length]!;
 }
 
 function conditionFromMetrics(meanL: number, lapVar: number, seed: number): ConditionKind {
@@ -139,34 +259,17 @@ function conditionFromMetrics(meanL: number, lapVar: number, seed: number): Cond
 
 function itemCountFromEdges(edgeEnergy: number, seed: number): number {
   const base = 1 + Math.floor(edgeEnergy / 45);
-  const capped = Math.min(4, Math.max(1, base));
-  if ((seed % 5) === 0 && capped < 3) return capped + 1;
-  return capped;
+  const capped = Math.min(5, Math.max(1, base));
+  return (seed % 5) === 0 && capped < 4 ? capped + 1 : capped;
 }
 
-function recyclabilityFor(kind: PlasticKind): RecyclabilityLevel {
-  if (kind === "PET" || kind === "HDPE" || kind === "PP") return "high";
-  if (kind === "LDPE" || kind === "PVC") return "moderate";
-  if (kind === "PS" || kind === "Other") return "low";
-  return "moderate";
+// Heuristic: estimate how many individual items are visible based on edge complexity
+function countEstimateForItem(edgeEnergy: number, seed: number, idx: number): number {
+  const base = 1 + Math.floor((edgeEnergy / 60) * (1 - idx * 0.15));
+  return Math.max(1, Math.min(8, base + ((seed >> (idx + 2)) % 3)));
 }
 
-function binFor(kind: PlasticKind): { key: ScanAnalysis["binColorKey"]; label: string } {
-  switch (kind) {
-    case "PET":
-    case "HDPE":
-    case "PP":
-      return { key: "blue", label: "Blue / dry recyclables (rigid plastics)" };
-    case "LDPE":
-      return { key: "yellow", label: "Yellow or film-plastic drop-off (not curbside)" };
-    case "PS":
-      return { key: "red", label: "Special waste / reject — check local PS programs" };
-    case "PVC":
-      return { key: "special", label: "Special handling — rarely in mixed recycling" };
-    default:
-      return { key: "green", label: "Mixed or local guidance — confirm with municipality" };
-  }
-}
+// ── Main Camera 2 analysis function ─────────────────────────────────────────
 
 export async function analyzeImageElement(
   source: CanvasImageSource,
@@ -176,9 +279,10 @@ export async function analyzeImageElement(
   const canvas = downscaleToCanvas(source, 400);
   const { meanL, lapVar, edgeEnergy } = measureSharpnessAndBrightness(canvas);
   const ctx = canvas.getContext("2d");
-  const data = ctx?.getImageData(0, 0, canvas.width, canvas.height).data;
-  const seed = data ? hashImageSample(data) : Date.now();
+  const pixelData = ctx?.getImageData(0, 0, canvas.width, canvas.height).data;
+  const seed = pixelData ? hashImageSample(pixelData) : Date.now();
 
+  // Quality check
   const issues: string[] = [];
   let liveHint: string | null = null;
   if (meanL < 45) {
@@ -187,103 +291,102 @@ export async function analyzeImageElement(
   }
   if (lapVar < 80) {
     issues.push("blurry");
-    liveHint =
-      liveHint ||
-      (lang === "hi" ? "कैमरा स्थिर रखें, थोड़ा करीब आएं" : lang === "es" ? "Acerca el objeto y enfoca" : "Move closer and hold steady");
+    liveHint = liveHint || (lang === "hi" ? "कैमरा स्थिर रखें" : lang === "es" ? "Acerca el objeto" : "Move closer and hold steady");
   }
-
   const qualityOk = issues.length === 0;
 
+  // Detect material kinds from filename hints + image metrics
+  const nameLower = fileName.toLowerCase();
   const n = itemCountFromEdges(edgeEnergy, seed);
   const items: DetectedItem[] = [];
-  const nameLower = fileName.toLowerCase();
-  for (let i = 0; i < n; i++) {
-    let kind = pickPlastic(seed + i * 7919, edgeEnergy / 100 + i * 0.1);
-    if (/pet|bottle|water|soda/i.test(nameLower) && i === 0) kind = "PET";
-    if (/(hdpe|detergent|milk|shampoo)/i.test(nameLower) && i === 0) kind = "HDPE";
-    if (/(bag|film|wrapper|ldpe)/i.test(nameLower) && i === 0) kind = "LDPE";
-    if (/(foam|styro|thermocol|ps)/i.test(nameLower) && i === 0) kind = "PS";
 
+  for (let i = 0; i < n; i++) {
+    let kind = pickMaterial(seed + i * 7919, edgeEnergy / 100 + i * 0.1);
+
+    // Filename-based overrides (Camera 2 uses visual cues; filename hints simulate that)
+    if (i === 0) {
+      if (/pet|bottle|water|soda|cola/i.test(nameLower)) kind = "PET_BOTTLE";
+      else if (/hdpe|detergent|milk|shampoo/i.test(nameLower)) kind = "HDPE_BOTTLE";
+      else if (/can|aluminum|aluminium|beer|tin/i.test(nameLower)) kind = "METAL_CAN_ALUMINUM";
+      else if (/steel|food.can|soup/i.test(nameLower)) kind = "METAL_CAN_STEEL";
+      else if (/glass|jar/i.test(nameLower)) kind = "GLASS_BOTTLE_CLEAR";
+      else if (/cardboard|box|carton/i.test(nameLower)) kind = "CARDBOARD";
+      else if (/paper|newspaper|magazine/i.test(nameLower)) kind = "PAPER";
+      else if (/tetra|juice.pack|milk.pack/i.test(nameLower)) kind = "TETRA_PACK";
+    }
+
+    const meta = MATERIAL_META[kind];
     const condition = conditionFromMetrics(meanL, lapVar, seed + i * 31);
     const contamination: string[] = [];
     if (condition === "dirty") contamination.push("Possible food or organic residue");
-    if (kind === "Other") contamination.push("Mixed or unclear polymer layers");
-    if ((seed + i) % 7 === 0) contamination.push("Possible non-plastic components visible");
+    if (kind === "PLASTIC_OTHER" || kind === "NON_RECYCLABLE") contamination.push("Mixed or unclear material");
+    if ((seed + i) % 7 === 0 && condition !== "clean") contamination.push("Possible non-recyclable components");
 
     const brandHint =
       /coke|pepsi|bisleri|nestle|hul|unilever/i.test(nameLower) && i === 0
         ? nameLower.match(/coke|pepsi|bisleri|nestle|hul|unilever/i)?.[0] ?? null
-        : (seed + i) % 4 === 0
-          ? "Unlabeled — check resin code"
-          : null;
+        : (seed + i) % 4 === 0 ? "Unlabeled" : null;
 
     const w0 = 12 + ((seed >> (i + 3)) % 180);
     const w1 = w0 + 40 + ((seed >> (i + 5)) % 120);
+    const countEst = countEstimateForItem(edgeEnergy, seed, i);
 
     items.push({
-      plasticType: kind,
-      displayType: PLASTIC_LABELS[kind],
+      materialKind: kind,
+      plasticType: meta.plasticType,
+      displayType: meta.displayType,
       confidence: Math.min(0.97, 0.58 + (lapVar / 800) * 0.25 + (qualityOk ? 0.12 : 0) - i * 0.04),
       condition,
       contamination,
       brandHint,
       weightEstimateGrams: [w0, w1],
+      countEstimate: countEst,
+      creditUnit: meta.creditUnit,
+      creditsPerUnit: meta.creditsPerUnit,
     });
   }
 
   const primary = items[0]!;
-  const rec = recyclabilityFor(primary.plasticType);
-  const bin = binFor(primary.plasticType);
+  const primaryMeta = MATERIAL_META[primary.materialKind];
+  const rec = primaryMeta.recyclability;
 
   const recyclabilityExplanation =
     rec === "high"
-      ? "Widely accepted in rigid plastic streams when clean and sorted."
+      ? "Widely accepted in standard recycling streams when clean and sorted."
       : rec === "moderate"
-        ? "Recyclable only in specific streams; avoid contaminating mixed bins."
-        : "Often not accepted curbside; use designated programs or disposal guidance.";
+        ? "Recyclable only in specific streams — check local facility guidance."
+        : "Not accepted in standard recycling. Use designated disposal programs.";
 
   const preparation =
     primary.condition === "clean"
-      ? ["Rinse if required by local rules.", "Remove caps/labels only if your facility asks.", "Keep dry before drop-off."]
-      : ["Rinse thoroughly to remove residue.", "Let dry before recycling.", "Separate films from rigid plastics."];
+      ? ["Rinse if required by local rules.", "Keep dry before drop-off."]
+      : ["Rinse thoroughly to remove residue.", "Let dry before recycling."];
 
-  const carbonCreditsApprox = Math.round(0.08 * (primary.weightEstimateGrams[0] + primary.weightEstimateGrams[1]) / 2);
-
-  const facilityNote =
-    "Drop at a nearby dry-waste center or kabadiwalla accepting " +
-    primary.displayType +
-    ". Enable location in the app when available for tailored suggestions.";
-
-  const environmentalImpact =
-    "Diverting this material cuts landfill methane and reduces virgin plastic demand when reprocessed correctly.";
-
-  const upcycling =
-    primary.plasticType === "PET"
-      ? ["Cut bottles into planters or organizers.", "PET ribbon for crafts where safe."]
-      : ["Storage bins for non-food use.", "Art projects with clean, smooth pieces."];
-
-  const educationalTip =
-    "Resin codes (#1–#7) describe polymer type, not guaranteed recyclability — always follow local labels.";
-
-  const uncertainAlternative =
-    primary.confidence < 0.72
-      ? "If unsure, use your municipality's waste app or ask at the collection point before mixing streams."
-      : null;
+  const carbonCreditsApprox = Math.round(
+    primary.creditUnit === "each"
+      ? primary.creditsPerUnit * primary.countEstimate
+      : primary.creditsPerUnit * ((primary.weightEstimateGrams[0] + primary.weightEstimateGrams[1]) / 2 / 1000)
+  );
 
   return {
     quality: { ok: qualityOk, issues, liveHint },
     items,
     recyclability: rec,
     recyclabilityExplanation,
-    binColorKey: bin.key,
-    binColorLabel: bin.label,
+    binColorKey: primaryMeta.binColorKey,
+    binColorLabel: primaryMeta.binColorLabel,
     preparation,
     carbonCreditsApprox,
-    facilityNote,
-    environmentalImpact,
-    upcycling,
-    educationalTip,
-    uncertainAlternative,
+    facilityNote: `Drop at a nearby collection point accepting ${primary.displayType}.`,
+    environmentalImpact: "Diverting this material reduces landfill waste and conserves raw materials.",
+    upcycling: primary.materialKind === "PET_BOTTLE"
+      ? ["Cut bottles into planters.", "Use as storage containers."]
+      : ["Repurpose for storage.", "Use in craft projects."],
+    educationalTip: "Always check your local recycling guidelines — accepted materials vary by facility.",
+    uncertainAlternative:
+      primary.confidence < 0.72
+        ? "If unsure about this material, ask at the collection point before mixing streams."
+        : null,
   };
 }
 
