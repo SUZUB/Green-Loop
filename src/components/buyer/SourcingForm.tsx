@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,9 +33,6 @@ const materials = ["HDPE", "PET", "PP", "LDPE", "Mixed Plastic", "Aluminum"];
 const timeFrames = ["3 days", "1 week", "2 weeks", "1 month"];
 const deliveryOptions = ["Delivery to my address", "Self-pickup", "Partner transport"];
 
-const SOURCING_STORAGE_KEY = "buyer_sourcing_requests";
-const ORDER_STORAGE_KEY = "buyer_order_tracker_orders";
-
 export function SourcingForm({ onPostRequest }: { onPostRequest: (request: SourcingRequest) => void }) {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
@@ -47,32 +44,7 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
   const [timeline, setTimeline] = useState(timeFrames[1]);
   const [delivery, setDelivery] = useState(deliveryOptions[0]);
   const [notes, setNotes] = useState("");
-  const [recentRequests, setRecentRequests] = useState<SourcingRequest[]>([]);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(SOURCING_STORAGE_KEY);
-    if (stored) {
-      setRecentRequests(JSON.parse(stored));
-    }
-  }, []);
-
   const stepLabels = ["Request", "Supplier", "Confirm"];
-
-  const saveOrder = (request: SourcingRequest) => {
-    const existing = window.localStorage.getItem(ORDER_STORAGE_KEY);
-    const orders = existing ? JSON.parse(existing) as any[] : [];
-    const order = {
-      orderId: `ORD-${Date.now()}`,
-      supplier: request.supplier,
-      material: request.material,
-      quantity: `${request.quantity} ${request.unit}`,
-      totalCredits: request.quantity * (request.unit === "tons" ? 50 : 10),
-      status: "Sourcing",
-      createdAt: request.createdAt,
-      buyerName: "RecycleHub Buyer",
-    };
-    window.localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify([order, ...orders]));
-  };
 
   const handlePostRequest = () => {
     const request: SourcingRequest = {
@@ -90,11 +62,6 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
       createdAt: new Date().toISOString(),
     };
 
-    const stored = window.localStorage.getItem(SOURCING_STORAGE_KEY);
-    const list = stored ? (JSON.parse(stored) as SourcingRequest[]) : [];
-    window.localStorage.setItem(SOURCING_STORAGE_KEY, JSON.stringify([request, ...list]));
-    setRecentRequests([request, ...list]);
-    saveOrder(request);
     onPostRequest(request);
     setStep(1);
     setQuantity(5);
@@ -107,18 +74,18 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
   };
 
   return (
-    <Card className="rounded-[28px] bg-white/10 border border-white/20 backdrop-blur-xl shadow-2xl shadow-emerald-900/20 p-6">
+    <Card className="rounded-[28px] bg-white border border-slate-200 shadow-card p-6">
       <div className="mb-6">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/80">Sourcing Request</p>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Post a new request</h2>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Sourcing Request</p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Post a new request</h2>
           </div>
-          <span className="rounded-full bg-emerald-900/80 px-3 py-2 text-xs font-semibold text-emerald-100">Live pipeline</span>
+          <span className="rounded-full bg-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-800">Live pipeline</span>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.28em] text-slate-400">
+        <div className="mt-4 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
           {stepLabels.map((label, index) => (
-            <div key={label} className={`rounded-full px-3 py-2 ${step === index + 1 ? "bg-emerald-500/15 text-emerald-100" : "bg-white/5 text-slate-300"}`}>
+            <div key={label} className={`rounded-full px-3 py-2 ${step === index + 1 ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
               {label}
             </div>
           ))}
@@ -132,7 +99,7 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
             <select
               value={material}
               onChange={(event) => setMaterial(event.target.value)}
-              className="w-full rounded-xl border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
             >
               {materials.map((type) => (
                 <option key={type} value={type}>{type}</option>
@@ -154,7 +121,7 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
               <select
                 value={unit}
                 onChange={(event) => setUnit(event.target.value)}
-                className="w-full rounded-xl border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
               >
                 <option value="kg">kg</option>
                 <option value="tons">tons</option>
@@ -166,7 +133,7 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
             <select
               value={timeline}
               onChange={(event) => setTimeline(event.target.value)}
-              className="w-full rounded-xl border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
             >
               {timeFrames.map((frame) => (
                 <option key={frame} value={frame}>{frame}</option>
@@ -186,7 +153,7 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
             <select
               value={supplier}
               onChange={(event) => setSupplier(event.target.value)}
-              className="w-full rounded-xl border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
             >
               {SUPPLIER_OPTIONS.map((item) => (
                 <option key={item} value={item}>{item}</option>
@@ -198,7 +165,7 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
             <select
               value={location}
               onChange={(event) => setLocation(event.target.value)}
-              className="w-full rounded-xl border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
             >
               <option value="Mumbai Collection Center">Mumbai Collection Center</option>
               <option value="Bangalore Sorting Hub">Bangalore Sorting Hub</option>
@@ -210,7 +177,7 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
             <select
               value={delivery}
               onChange={(event) => setDelivery(event.target.value)}
-              className="w-full rounded-xl border border-white/20 bg-slate-950/70 px-3 py-2 text-sm text-white"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
             >
               {deliveryOptions.map((option) => (
                 <option key={option} value={option}>{option}</option>
@@ -234,8 +201,8 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
 
       {step === 3 && (
         <div className="space-y-4">
-          <div className="rounded-3xl bg-slate-950/80 p-4 border border-white/10">
-            <div className="flex items-center justify-between text-sm text-slate-400">
+          <div className="rounded-3xl bg-slate-50 p-4 border border-slate-200">
+            <div className="flex items-center justify-between text-sm text-slate-500">
               <span>Request</span>
               <span>{new Date().toLocaleDateString()}</span>
             </div>

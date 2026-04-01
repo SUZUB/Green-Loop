@@ -336,32 +336,30 @@ export function AIChatBot() {
 
   return (
     <>
-      <AnimatePresence>
-        {!open && (
-          <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0 }}
-            className="fixed bottom-20 right-4 z-50"
-          >
-            <Button
-              onClick={() => setOpen(true)}
-              className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-blue-500 text-white shadow-[0_20px_50px_rgba(59,130,246,0.35)] hover:shadow-lg"
-            >
-              <MessageSquare className="h-6 w-6" />
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Chat Button - Always rendered, animated based on open state */}
+      <motion.div
+        initial={{ opacity: 1, y: 0, scale: 1 }}
+        animate={open ? { opacity: 0, y: 16, scale: 0 } : { opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.2 }}
+        className="fixed bottom-20 right-4 z-50"
+        style={{ pointerEvents: open ? "none" : "auto" }}
+      >
+        <Button
+          onClick={() => setOpen(true)}
+          className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-blue-500 text-white shadow-[0_20px_50px_rgba(59,130,246,0.35)] hover:shadow-lg"
+        >
+          <MessageSquare className="h-6 w-6" />
+        </Button>
+      </motion.div>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 32, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 32, scale: 0.95 }}
-            className="fixed bottom-20 right-4 z-50 w-[360px] max-h-[84vh] rounded-[32px] p-[1px] bg-gradient-to-r from-emerald-400 via-sky-500 to-blue-500 shadow-[0_30px_80px_rgba(59,130,246,0.25)]"
-          >
+      {/* Chat Window - Always rendered, animated based on open state */}
+      <motion.div
+        initial={{ opacity: 1, y: 0, scale: 1 }}
+        animate={open ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 32, scale: 0.95 }}
+        transition={{ duration: 0.2 }}
+        className="fixed bottom-20 right-4 z-50 w-[360px] max-h-[84vh] rounded-[32px] p-[1px] bg-gradient-to-r from-emerald-400 via-sky-500 to-blue-500 shadow-[0_30px_80px_rgba(59,130,246,0.25)]"
+        style={{ pointerEvents: open ? "auto" : "none", display: open ? "block" : "none" }}
+      >
             <div className="flex h-full flex-col overflow-hidden rounded-[30px] bg-slate-950 shadow-2xl">
               <div className="flex items-center justify-between gap-3 px-4 py-3 bg-slate-900/95 border-b border-white/10">
                 <div className="flex items-center gap-3">
@@ -382,7 +380,7 @@ export function AIChatBot() {
                 {messages.map((msg, index) => (
                   <motion.div
                     key={`${msg.role}-${index}`}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 1, y: 0 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
@@ -445,8 +443,6 @@ export function AIChatBot() {
               </div>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 }

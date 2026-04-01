@@ -15,12 +15,13 @@ import { useToast } from "@/hooks/use-toast";
 import { HeatmapPoint } from "@/hooks/useHeatmapData";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  CalendarPlus, Trophy, Leaf, Wallet, BookOpen, Users, Gift,
+  LayoutDashboard, CalendarPlus, Trophy, Leaf, Wallet, BookOpen, Users, Gift,
   Award, Share2, Coins, ChevronRight, QrCode, MessageCircle,
   Package, Ticket, DollarSign,
 } from "lucide-react";
 
 const quickActions = [
+  { key: "dashboard", icon: LayoutDashboard, label: "Dashboard", path: "/recycler/dashboard", color: "bg-cyan-500" },
   { key: "bookPickup", icon: CalendarPlus, label: "Book Pickup", path: "/recycler/booking", color: "bg-emerald-500" },
   { key: "leaderboard", icon: Trophy, label: "Leaderboard", path: "/recycler/leaderboard", color: "bg-sky-500" },
   { key: "myImpact", icon: Leaf, label: "My Impact", path: "/recycler/impact", color: "bg-emerald-600" },
@@ -94,6 +95,9 @@ const RecyclerDashboard = () => {
   }, [selectedAction, navigate]);
 
   const quickActionSummaries: Record<QuickActionKey, { subtitle: string; badge?: { label: string; count: number; color: string } }> = {
+    dashboard: {
+      subtitle: "View overview",
+    },
     bookPickup: {
       subtitle: quickActionStats.bookPickup.nextScheduled,
       badge: { label: "Recent", count: quickActionStats.bookPickup.recentPickups, color: "bg-emerald-500" },
@@ -130,6 +134,7 @@ const RecyclerDashboard = () => {
   };
 
   const quickActionCountProps: Record<QuickActionKey, { value: number; prefix?: string; suffix?: string; decimals?: number }> = {
+    dashboard: { value: stats.coinBalance },
     bookPickup: { value: quickActionStats.bookPickup.recentPickups },
     leaderboard: { value: quickActionStats.leaderboard.rank, prefix: "#" },
     myImpact: { value: quickActionStats.myImpact.totalWasteDivertedKg, suffix: " kg", decimals: 1 },
@@ -225,7 +230,7 @@ const RecyclerDashboard = () => {
             exit={{ opacity: 0, scale: 0.95 }}
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto"
           >
-            <Dialog open onOpenChange={() => setSelectedAction(null)}>
+            <Dialog open={!!selectedAction && selectedAction !== "rewards"} onOpenChange={() => setSelectedAction(null)}>
               <DialogContent className="rounded-2xl bg-[#020617]/95 backdrop-blur-3xl border border-emerald-500/20 shadow-2xl max-w-md">
                 <DialogHeader>
                   <DialogTitle className="text-white text-xl drop-shadow-md">

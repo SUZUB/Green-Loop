@@ -8,8 +8,6 @@ import { generateInvoice, InvoiceOrder } from "@/utils/generateInvoice";
 import { useTimeSimulation } from "@/hooks/useTimeSimulation";
 import { Download, ArrowRight, Shield, MapPin, Clock, CheckCircle2 } from "lucide-react";
 
-const ORDER_STORAGE_KEY = "buyer_order_tracker_orders";
-
 export type OrderStatus = "Sourcing" | "In Transit" | "Delivered" | "Completed";
 
 export interface BuyerOrder {
@@ -75,19 +73,10 @@ const statuses: OrderStatus[] = ["Sourcing", "In Transit", "Delivered", "Complet
 export default function OrderTracker() {
   const { toast } = useToast();
   const simulation = useTimeSimulation();
-  const { trackOrders } = useRecycleHub();
+  const { trackOrders, updateTrackOrderStatus } = useRecycleHub();
   const [orders, setOrders] = useState<BuyerOrder[]>([]);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(ORDER_STORAGE_KEY);
-    if (stored) {
-      try {
-        setOrders(JSON.parse(stored));
-        return;
-      } catch {
-        // fall through
-      }
-    }
     setOrders(
       trackOrders.map((item) => ({
         orderId: item.id,
@@ -102,23 +91,20 @@ export default function OrderTracker() {
     );
   }, [trackOrders]);
 
-  useEffect(() => {
-    window.localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders));
-  }, [orders]);
-
   const groupedOrders = useMemo(
     () => statuses.map((status) => ({ status, items: orders.filter((order) => order.status === status) })),
     [orders]
   );
 
   const advanceOrder = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.orderId === orderId
-          ? { ...order, status: statusSequence[order.status] }
-          : order
-      )
-    );
+    setOrders((prev) => {
+      const next = prev.map((order) =>
+        order.orderId === orderId ? { ...order, status: statusSequence[order.status] } : order
+      );
+      const updated = next.find((o) => o.orderId === orderId);
+      if (updated) updateTrackOrderStatus(orderId, updated.status);
+      return next;
+    });
   };
 
   const downloadInvoice = (order: BuyerOrder) => {

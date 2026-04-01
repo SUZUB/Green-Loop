@@ -70,6 +70,17 @@ export default function ChallengesPage() {
   const [map, setMap] = useState<L.Map | null>(null);
 
   useEffect(() => {
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    const originalBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!map || !selectedChallenge) return;
     map.flyTo([selectedChallenge.lat, selectedChallenge.lng], 13, { duration: 1.1 });
   }, [map, selectedChallenge]);
@@ -95,10 +106,10 @@ export default function ChallengesPage() {
   const pickerMarkers = heatmapReports.slice(0, 6);
 
   return (
-    <div className="min-h-screen bg-background/30 text-slate-100 overflow-x-hidden">
+    <div className="h-screen bg-background/30 text-slate-100 overflow-hidden">
       <PageBackground type="oceanPlastic" overlay="bg-foreground/50" />
-      <div className="container mx-auto max-w-7xl px-4 py-8">
-        <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="container mx-auto max-w-7xl h-full px-4 py-6 flex flex-col min-h-0">
+        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between shrink-0">
           <div>
             <p className="text-sm uppercase tracking-[0.3em] text-slate-400">RecycleHub Coordination</p>
             <h1 className="text-3xl sm:text-4xl font-display font-bold">Community Cleanup Challenges</h1>
@@ -122,8 +133,8 @@ export default function ChallengesPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-          <section className="space-y-6">
+        <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)] flex-1 min-h-0">
+          <section className="space-y-6 min-h-0 overflow-hidden">
             <Card className="rounded-[32px] bg-slate-950/90 border border-white/10 p-6 shadow-2xl">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -150,7 +161,7 @@ export default function ChallengesPage() {
               </div>
             </Card>
 
-            <div className="space-y-6">
+            <div className="space-y-6 flex-1 min-h-0 overflow-y-auto pr-2">
               {([challengeGroups.level1, challengeGroups.level2, challengeGroups.level3] as ChallengeCard[][]).map((group, index) => (
                 <div key={index} className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -218,7 +229,7 @@ export default function ChallengesPage() {
             </div>
           </section>
 
-          <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/90 shadow-2xl">
+          <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/90 shadow-2xl min-h-0">
             <div className="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-slate-950/95 px-6 py-5 backdrop-blur">
               <div>
                 <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Satellite Map</p>
@@ -229,11 +240,11 @@ export default function ChallengesPage() {
                 <span className="rounded-full bg-white/10 px-3 py-2">{heatmapReports[0]?.label}</span>
               </div>
             </div>
-            <div className="relative h-[calc(100vh-10rem)]">
+            <div className="relative h-full pt-[86px]">
               <MapContainer
                 center={[12.94, 77.62]}
                 zoom={12}
-                scrollWheelZoom={true}
+                scrollWheelZoom={false}
                 whenCreated={setMap}
                 className="h-full w-full"
               >

@@ -1,73 +1,113 @@
-# Welcome to your Lovable project
+# Green Loop (RecycleHub) — Web App
 
-## Project info
+Green Loop is a multi-role recycling platform UI built with React + TypeScript. It includes role-based dashboards (Recycler / Picker / Buyer), maps + heatmaps, community challenges, a wallet/market experience, and an AI recycling assistant powered by a Supabase Edge Function.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tech stack
 
-## How can I edit this code?
+- React 18 + TypeScript
+- Vite (dev server runs on port **8080**)
+- Tailwind CSS + shadcn-ui (Radix UI)
+- React Router v6
+- TanStack Query
+- Supabase (Auth, DB, Edge Functions)
+- Leaflet + react-leaflet + leaflet.heat
+- Vitest + Testing Library
 
-There are several ways of editing your application.
+## Getting started
 
-**Use Lovable**
+### Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- Node.js (recommended: 18+)
+- npm
 
-Changes made via Lovable will be committed automatically to this repo.
+### Install
 
-**Use your preferred IDE**
+```bash
+npm install
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Environment variables
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Create a `.env` file in the project root (same folder as `package.json`):
 
-Follow these steps:
+```bash
+VITE_SUPABASE_URL="https://<project-ref>.supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY="<anon key>"
+VITE_SUPABASE_PROJECT_ID="<project-ref>"
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Important:
+- **Do not commit** `.env` to git. Keep secrets out of the repository.
+- The app reads these via `import.meta.env.*` in `src/integrations/supabase/client.ts`.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Run the app
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Then open `http://localhost:8080`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Supabase Edge Function (AI assistant)
 
-**Use GitHub Codespaces**
+The chatbot UI calls the edge function named `recycling-chat`:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- Function code: `supabase/functions/recycling-chat/index.ts`
+- Invoked from: `src/components/AIChatBot.tsx` and `src/components/RecycleChatbot.tsx`
 
-## What technologies are used for this project?
+The edge function requires a server-side secret:
 
-This project is built with:
+- `LOVABLE_API_KEY` (configured in Supabase Function secrets)
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+If the key is missing, the chatbot will return an error.
 
-## How can I deploy this project?
+## Key routes
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+- **Public**
+  - `/` (landing)
+  - `/role-select`
+  - `/auth/login?role=recycler|picker|buyer`
+  - `/auth/signup?role=recycler|picker|buyer`
 
-## Can I connect a custom domain to my Lovable project?
+- **Recycler**
+  - `/recycler/dashboard`
+  - `/recycler/booking`
+  - `/recycler/rewards`
+  - `/recycler/leaderboard`
+  - `/recycler/challenges`
+  - `/recycler/impact`
+  - `/recycler/wallet`
+  - `/recycler/referral`
+  - `/recycler/profile`
 
-Yes, you can!
+- **Picker**
+  - `/picker/dashboard`
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- **Buyer**
+  - `/buyer/dashboard`
+  - `/buyer/listings`
+  - `/buyer/orders`
+  - `/buyer/suppliers`
+  - `/buyer/analytics`
+  - `/buyer/messages`
+  - `/buyer/payments`
+  - `/buyer/carbon-market`
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Project structure (high level)
+
+- `src/pages/` — route pages (auth, recycler, picker, buyer)
+- `src/components/` — UI components + layouts + chatbot
+- `src/components/ui/` — shadcn UI components
+- `src/hooks/` — state + simulation hooks (notably `useRecycleHub`)
+- `src/context/` — app contexts (`EcoContext`, `DialogContext`)
+- `src/integrations/supabase/` — Supabase client + generated types
+- `supabase/functions/` — edge functions (Deno)
+
+## Scripts
+
+- `npm run dev` — start Vite dev server
+- `npm run build` — production build
+- `npm run preview` — preview production build
+- `npm run lint` — eslint
+- `npm run test` — vitest run
+- `npm run test:watch` — vitest watch mode

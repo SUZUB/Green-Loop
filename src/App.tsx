@@ -5,9 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import { EcoProvider } from "@/context/EcoContext";
+import { DialogProvider } from "@/context/DialogContext";
 import { RecycleHubProvider } from "@/hooks/useRecycleHub";
 import { AIChatBot } from "./components/AIChatBot";
-import { PageBackground } from "./components/PageBackground";
+import { Layout } from "./components/Layout";
 import RoleSelect from "./pages/RoleSelect";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
@@ -45,52 +46,51 @@ const App = () => (
       <Toaster />
       <Sonner />
       <EcoProvider>
-        <RecycleHubProvider>
-        <BrowserRouter>
-          <div className="relative min-h-screen min-w-screen overflow-hidden text-white">
-            <PageBackground type="oceanPlastic" overlay="bg-black/60" />
-            <div className="relative z-20 min-h-screen">
+        <DialogProvider>
+          <RecycleHubProvider>
+            <BrowserRouter>
               <Routes>
+                {/* Public routes without Layout */}
                 <Route path="/" element={<Index />} />
                 <Route path="/role-select" element={<RoleSelect />} />
                 <Route path="/auth/login" element={<Login />} />
                 <Route path="/auth/signup" element={<Signup />} />
-                {/* Recycler routes with sidebar layout */}
-                <Route element={<RecyclerLayout />}>
-                  <Route path="/recycler/dashboard" element={<RecyclerDashboard />} />
-                  <Route path="/recycler/booking" element={<Booking />} />
-                  <Route path="/recycler/rewards" element={<Rewards />} />
-                  <Route path="/recycler/leaderboard" element={<Leaderboard />} />
-                  <Route path="/recycler/challenges" element={<ChallengesPage />} />
-                  <Route path="/recycler/achievements" element={<Achievements />} />
-                  <Route path="/recycler/impact" element={<Impact />} />
-                  <Route path="/recycler/wallet" element={<Wallet />} />
-                  <Route path="/recycler/referral" element={<Referral />} />
-                  <Route path="/recycler/profile" element={<Profile />} />
-                  <Route path="/education/knowledge-hub" element={<KnowledgeHub />} />
-                  <Route path="/community" element={<Community />} />
-                  <Route path="/partners" element={<Partners />} />
+
+                {/* Protected routes with Layout */}
+                <Route element={<Layout><AIChatBot /></Layout>}>
+                  <Route element={<RecyclerLayout />}>
+                    <Route path="/recycler/dashboard" element={<RecyclerDashboard />} />
+                    <Route path="/recycler/booking" element={<Booking />} />
+                    <Route path="/recycler/rewards" element={<Rewards />} />
+                    <Route path="/recycler/leaderboard" element={<Leaderboard />} />
+                    <Route path="/recycler/challenges" element={<ChallengesPage />} />
+                    <Route path="/recycler/achievements" element={<Achievements />} />
+                    <Route path="/recycler/impact" element={<Impact />} />
+                    <Route path="/recycler/wallet" element={<Wallet />} />
+                    <Route path="/recycler/referral" element={<Referral />} />
+                    <Route path="/recycler/profile" element={<Profile />} />
+                    <Route path="/education/knowledge-hub" element={<KnowledgeHub />} />
+                    <Route path="/community" element={<Community />} />
+                    <Route path="/partners" element={<Partners />} />
+                  </Route>
+                  <Route path="/picker/dashboard" element={<PickerDashboard />} />
+                  <Route path="/buyer/dashboard" element={<BuyerDashboard />} />
+                  <Route path="/buyer/listings" element={<BuyerListings />} />
+                  <Route path="/buyer/orders" element={<BuyerOrders />} />
+                  <Route path="/buyer/suppliers" element={<BuyerSuppliers />} />
+                  <Route path="/buyer/analytics" element={<BuyerAnalytics />} />
+                  <Route path="/buyer/profile" element={<BuyerProfile />} />
+                  <Route path="/buyer/messages" element={<BuyerMessages />} />
+                  <Route path="/buyer/payments" element={<BuyerPayments />} />
+                  <Route path="/buyer/carbon-market" element={<CarbonMarket />} />
+                  <Route path="/challenges" element={<ChallengesPage />} />
                 </Route>
-                {/* Picker routes */}
-                <Route path="/picker/dashboard" element={<PickerDashboard />} />
-                {/* Buyer routes */}
-                <Route path="/buyer/dashboard" element={<BuyerDashboard />} />
-                <Route path="/buyer/listings" element={<BuyerListings />} />
-                <Route path="/buyer/orders" element={<BuyerOrders />} />
-                <Route path="/buyer/suppliers" element={<BuyerSuppliers />} />
-                <Route path="/buyer/analytics" element={<BuyerAnalytics />} />
-                <Route path="/buyer/profile" element={<BuyerProfile />} />
-                <Route path="/buyer/messages" element={<BuyerMessages />} />
-                <Route path="/buyer/payments" element={<BuyerPayments />} />
-                <Route path="/buyer/carbon-market" element={<CarbonMarket />} />
-                <Route path="/challenges" element={<ChallengesPage />} />
+
                 <Route path="*" element={<NotFound />} />
               </Routes>
-              <AIChatBot />
-            </div>
-          </div>
-        </BrowserRouter>
-      </RecycleHubProvider>
+            </BrowserRouter>
+          </RecycleHubProvider>
+        </DialogProvider>
       </EcoProvider>
     </TooltipProvider>
   </QueryClientProvider>

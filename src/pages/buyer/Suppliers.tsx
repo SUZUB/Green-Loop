@@ -30,7 +30,7 @@ const INITIAL_PENDING_APPLICATIONS = [
 
 const BuyerSuppliers = () => {
   const { toast } = useToast();
-  const { supplierApplications, addSourcingRequest } = useRecycleHub();
+  const { supplierApplications, addSourcingRequest, addTrackOrder } = useRecycleHub();
   const [selectedSupplier, setSelectedSupplier] = useState<typeof suppliers[0] | null>(null);
   const [tab, setTab] = useState<"suppliers" | "applications">("suppliers");
   const [search, setSearch] = useState("");
@@ -62,6 +62,18 @@ const BuyerSuppliers = () => {
       requiredBy: request.timeline,
       status: "Active",
       applications: Math.floor(Math.random() * 15) + 5,
+    });
+
+    addTrackOrder({
+      supplier: request.supplier,
+      materialType: request.material,
+      quantity: `${request.quantity} ${request.unit}`,
+      pricePerKg: "₹15/kg",
+      totalAmount: `₹${Math.round(request.quantity * (request.unit === "tons" ? 50000 : 50)).toLocaleString("en-IN")}`,
+      status: "In Transit",
+      orderDate: new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric" }),
+      eta: "3 days",
+      invoiceReady: true,
     });
     
     toast({

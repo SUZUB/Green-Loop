@@ -94,6 +94,8 @@ const MARKET_STORAGE_KEYS = {
   transactions: "recyclehub_market_transactions",
   globalMetrics: "recyclehub_global_metrics",
   challenges: "recyclehub_challenges",
+  sourcingRequests: "recyclehub_sourcing_requests",
+  trackOrders: "recyclehub_track_orders",
   recentActivity: "recyclehub_recent_activity",
   topRecyclers: "recyclehub_top_recyclers",
   quickActionStats: "recyclehub_quick_action_stats",
@@ -736,6 +738,8 @@ interface RecycleHubContextValue {
   quickActionStats: QuickActionStats;
   addTransaction: (transaction: Omit<MarketTransaction, "id" | "createdAt">) => void;
   addSourcingRequest: (request: Omit<SourcingRequest, "id">) => SourcingRequest;
+  addTrackOrder: (order: Omit<OrderTracker, "id"> & { id?: string }) => OrderTracker;
+  updateTrackOrderStatus: (orderId: string, status: OrderTracker["status"]) => void;
   completePurchase: (quantity: number) => boolean;
   refreshAllData: () => void;
 }
@@ -837,6 +841,30 @@ function useProvideRecycleHub() {
         setQuickActionStats(INITIAL_QUICK_ACTION_STATS);
       }
     }
+
+    const storedSourcingRequests = window.localStorage.getItem(MARKET_STORAGE_KEYS.sourcingRequests);
+    if (storedSourcingRequests) {
+      try {
+        const parsed = JSON.parse(storedSourcingRequests) as SourcingRequest[];
+        if (Array.isArray(parsed)) {
+          setSourcingRequests(parsed);
+        }
+      } catch {
+        setSourcingRequests(INITIAL_SOURCING_REQUESTS);
+      }
+    }
+
+    const storedTrackOrders = window.localStorage.getItem(MARKET_STORAGE_KEYS.trackOrders);
+    if (storedTrackOrders) {
+      try {
+        const parsed = JSON.parse(storedTrackOrders) as OrderTracker[];
+        if (Array.isArray(parsed)) {
+          setTrackOrders(parsed);
+        }
+      } catch {
+        setTrackOrders(INITIAL_TRACK_ORDERS);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -922,6 +950,14 @@ function useProvideRecycleHub() {
   useEffect(() => {
     window.localStorage.setItem(MARKET_STORAGE_KEYS.quickActionStats, JSON.stringify(quickActionStats));
   }, [quickActionStats]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.sourcingRequests, JSON.stringify(sourcingRequests));
+  }, [sourcingRequests]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.trackOrders, JSON.stringify(trackOrders));
+  }, [trackOrders]);
 
   // Sync userBalance with quickActionStats and leaderboard
   useEffect(() => {
@@ -1113,6 +1149,19 @@ function useProvideRecycleHub() {
     return newRequest;
   };
 
+  const addTrackOrder = (order: Omit<OrderTracker, "id"> & { id?: string }) => {
+    const newOrder: OrderTracker = {
+      ...order,
+      id: order.id ?? `ORD-${Date.now()}`,
+    };
+    setTrackOrders((prev) => [newOrder, ...prev]);
+    return newOrder;
+  };
+
+  const updateTrackOrderStatus = (orderId: string, status: OrderTracker["status"]) => {
+    setTrackOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+  };
+
   const completePurchase = (quantity: number) => {
     if (quantity < 1 || quantity > availableMarketCredits) {
       return false;
@@ -1152,6 +1201,8 @@ function useProvideRecycleHub() {
     quickActionStats,
     addTransaction,
     addSourcingRequest,
+    addTrackOrder,
+    updateTrackOrderStatus,
     completePurchase,
     refreshAllData,
   };

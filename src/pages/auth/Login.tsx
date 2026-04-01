@@ -56,9 +56,9 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background/40 flex flex-col">
+    <div className="relative min-h-screen bg-background/40 flex flex-col isolate">
       <PageBackground type="pollution" overlay="bg-foreground/50" />
-      <nav className="p-4">
+      <nav className="relative z-10 p-4">
         <Button
           variant="ghost"
           size="sm"
@@ -69,7 +69,7 @@ const Login = () => {
         </Button>
       </nav>
 
-      <div className="flex-1 flex items-center justify-center px-4">
+      <div className="relative z-10 flex-1 flex items-center justify-center px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

@@ -31,7 +31,11 @@ export const PageBackground = ({
   const y = useTransform(scrollYProgress, [0, 1], [`-${speed * 100}px`, `${speed * 100}px`]);
 
   return (
-    <div ref={ref} className="fixed inset-0 z-0 overflow-hidden">
+    <div
+      ref={ref}
+      className="fixed inset-0 -z-10 overflow-hidden pointer-events-none"
+      aria-hidden="true"
+    >
       <motion.img
         src={backgrounds[type]}
         alt=""

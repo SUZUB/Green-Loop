@@ -29,21 +29,27 @@ const dashboardItems: NavigationItem[] = [
 
 const recyclerToolsItems: NavigationItem[] = [
   { key: "challenges", icon: Zap, label: "Challenges", path: "/recycler/challenges" },
-  { key: "market", icon: ShoppingCart, label: "Market", path: "/buyer/dashboard" },
+  { key: "bookPickup", icon: CalendarPlus, label: "Book Pickup", path: "/recycler/booking" },
+  { key: "leaderboard", icon: Trophy, label: "Leaderboard", path: "/recycler/leaderboard" },
+  { key: "myImpact", icon: Leaf, label: "My Impact", path: "/recycler/impact" },
+  { key: "wallet", icon: Wallet, label: "Wallet", path: "/recycler/wallet" },
+  { key: "achievements", icon: Award, label: "Achievements", path: "/recycler/achievements" },
+  { key: "referrals", icon: Share2, label: "Referrals", path: "/recycler/referral" },
 ];
 
 const quickActionItems: QuickActionItem[] = [
-  { key: "wallet", icon: Wallet, label: "Wallet", path: "/recycler/wallet" },
-  { key: "leaderboard", icon: Trophy, label: "Leaderboard", path: "/recycler/leaderboard" },
-  { key: "myImpact", icon: Leaf, label: "My Impact", path: "/recycler/impact" },
-  { key: "achievements", icon: Award, label: "Achievements", path: "/recycler/achievements" },
-  { key: "referrals", icon: Share2, label: "Referrals", path: "/recycler/referral" },
   { key: "learn", icon: BookOpen, label: "Learn", path: "/education/knowledge-hub" },
   { key: "community", icon: Users, label: "Community", path: "/community" },
-  { key: "bookPickup", icon: CalendarPlus, label: "Book Pickup", path: "/recycler/booking" },
+  { key: "profile", icon: User, label: "Profile", path: "/recycler/profile" },
 ];
 
-export function RecyclerSidebar() {
+export function RecyclerSidebar({
+  sidebarOpen,
+  onToggleSidebar,
+}: {
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { globalMetrics, quickActionStats } = useRecycleHub();
@@ -70,21 +76,10 @@ export function RecyclerSidebar() {
         key={item.key}
         onClick={() => navigate(item.path)}
         whileHover={{ x: 4 }}
-        className={`w-full relative flex items-center gap-4 px-4 py-3 rounded-lg transition-all duration-200 group ${
-          active
-            ? "bg-emerald-500/10 text-white"
-            : "text-slate-300 hover:text-white"
+        className={`w-full relative flex items-center gap-4 px-4 py-3 rounded-xl transition-colors duration-150 group ${
+          active ? "bg-emerald-100/80 text-slate-900" : "text-slate-700 hover:bg-slate-100"
         }`}
       >
-        {/* Active indicator - left border */}
-        {active && (
-          <motion.div 
-            layoutId="activeIndicator"
-            className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 rounded-r"
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          />
-        )}
-        
         {/* Icon */}
         <motion.div
           whileHover={{ scale: 1.1 }}
@@ -94,14 +89,14 @@ export function RecyclerSidebar() {
             size={22} 
             strokeWidth={1.5}
             className={`shrink-0 transition-colors duration-200 ${
-              active ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-500"
+              active ? "text-slate-900" : "text-slate-600 group-hover:text-slate-800"
             }`}
           />
         </motion.div>
         
         {/* Label */}
         <span className={`text-sm font-semibold transition-colors duration-200 ${
-          active ? "text-white" : "group-hover:text-white"
+          active ? "text-slate-900" : "group-hover:text-slate-900"
         }`}>
           {item.label}
         </span>
@@ -118,13 +113,13 @@ export function RecyclerSidebar() {
         onClick={() => navigate(item.path)}
         whileHover={{ scale: 1.05, y: -2 }}
         transition={{ type: "spring", stiffness: 400, damping: 10 }}
-        className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm transition-all duration-200 group hover:border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+        className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl border border-slate-200 bg-white transition-colors duration-150 group hover:border-slate-300"
       >
         <Icon 
           size={20}
-          className="text-emerald-400 transition-transform duration-200 group-hover:text-emerald-300"
+          className="text-slate-700 transition-transform duration-200"
         />
-        <span className="text-[11px] font-semibold text-white/90 text-center leading-tight">
+        <span className="text-[11px] font-semibold text-slate-700 text-center leading-tight">
           {item.label}
         </span>
       </motion.button>
@@ -132,7 +127,7 @@ export function RecyclerSidebar() {
   };
 
   return (
-    <aside className="h-full min-h-screen p-6 space-y-8 bg-[#020617] overflow-y-auto scrollbar-hide text-white flex flex-col">
+    <aside className="h-full min-h-screen p-6 space-y-8 bg-slate-50 overflow-y-auto scrollbar-hide text-slate-900 flex flex-col border-r border-slate-200">
       {/* EcoSync Logo */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -142,16 +137,14 @@ export function RecyclerSidebar() {
       >
         <EcoLogo size="sm" />
         <div>
-          <p className="text-sm font-bold text-white tracking-wider">EcoSync</p>
-          <p className="text-xs text-slate-400">Green Loop</p>
+          <p className="text-sm font-bold text-slate-900 tracking-wider">EcoSync</p>
+          <p className="text-xs text-slate-500">Green Loop</p>
         </div>
       </motion.div>
 
       {/* Dashboard Section */}
       <nav className="space-y-3">
-        <h3 className="text-slate-500 uppercase tracking-widest text-[10px] font-semibold px-4 mb-3">
-          Dashboard
-        </h3>
+        <h3 className="text-slate-500 text-sm font-semibold px-2 mb-3">Navigation</h3>
         <div className="space-y-2">
           {dashboardItems.map(renderNavItem)}
         </div>
@@ -178,22 +171,20 @@ export function RecyclerSidebar() {
       </div>
 
       {/* Sidebar Stats Section */}
-      <div className="space-y-3 pt-4 border-t border-white/5">
-        <h3 className="text-slate-500 uppercase tracking-widest text-[10px] font-semibold px-4 mb-3">
-          Live Metrics
-        </h3>
+      <div className="space-y-3 pt-4 border-t border-slate-200">
+        <h3 className="text-slate-500 text-sm font-semibold px-2 mb-3">Live Metrics</h3>
         <div className="space-y-3">
           {/* Global Impact */}
           <motion.div
             whileHover={{ scale: 1.02 }}
-            className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 backdrop-blur-sm"
+            className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
           >
-            <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">Global Impact</p>
+            <p className="text-xs font-semibold text-slate-500 mb-1">Global Impact</p>
             <motion.div
               layout
               className="flex items-baseline gap-1"
             >
-              <p className="text-xl font-bold text-white">
+              <p className="text-xl font-bold text-slate-900">
                 <AnimatedCounter
                   value={Math.round(globalMetrics.totalPlasticRecycledKg)}
                   suffix=""
@@ -207,14 +198,14 @@ export function RecyclerSidebar() {
           {/* Live Pickers */}
           <motion.div
             whileHover={{ scale: 1.02 }}
-            className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 backdrop-blur-sm"
+            className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"
           >
-            <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">Live Pickers</p>
+            <p className="text-xs font-semibold text-slate-500 mb-1">Live Pickers</p>
             <motion.div
               layout
               className="flex items-baseline gap-1"
             >
-              <p className="text-xl font-bold text-white">
+              <p className="text-xl font-bold text-slate-900">
                 <AnimatedCounter
                   value={globalMetrics.livePickersOnline}
                   suffix=""
@@ -228,15 +219,15 @@ export function RecyclerSidebar() {
           {/* My Impact */}
           <motion.div
             whileHover={{ scale: 1.02 }}
-            className="relative rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 backdrop-blur-sm overflow-hidden"
+            className="relative rounded-xl border border-emerald-200 bg-emerald-50 p-3 overflow-hidden"
           >
             <PulseEffect trigger={impactPulseKey} color="rgba(16, 185, 129, 0.4)" intensity={1.2} />
-            <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">My Impact</p>
+            <p className="text-xs font-semibold text-slate-500 mb-1">My Impact</p>
             <motion.div
               layout
               className="flex items-baseline gap-1"
             >
-              <p className="text-xl font-bold text-white">
+              <p className="text-xl font-bold text-slate-900">
                 <AnimatedCounter
                   value={quickActionStats.myImpact.totalWasteDivertedKg}
                   suffix=""
@@ -250,24 +241,16 @@ export function RecyclerSidebar() {
       </div>
 
       {/* Profile Section */}
-      <div className="pt-4 border-t border-white/5 mt-auto">
+      <div className="pt-4 border-t border-slate-200 mt-auto space-y-2">
         <motion.button
           whileHover={{ x: 4 }}
           onClick={() => navigate("/recycler/profile")}
           className={`w-full relative flex items-center gap-4 px-4 py-3 rounded-lg transition-all duration-200 group ${
             isActive("/recycler/profile")
-              ? "bg-emerald-500/10 text-white"
-              : "text-slate-300 hover:text-white"
+              ? "bg-emerald-100/80 text-slate-900"
+              : "text-slate-700 hover:bg-slate-100"
           }`}
         >
-          {isActive("/recycler/profile") && (
-            <motion.div 
-              layoutId="activeIndicator"
-              className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 rounded-r"
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            />
-          )}
-          
           <motion.div
             whileHover={{ scale: 1.1 }}
             transition={{ type: "spring", stiffness: 400, damping: 10 }}
@@ -276,17 +259,25 @@ export function RecyclerSidebar() {
               size={22} 
               strokeWidth={1.5}
               className={`shrink-0 transition-colors duration-200 ${
-                isActive("/recycler/profile") ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-500"
+                isActive("/recycler/profile") ? "text-slate-900" : "text-slate-600 group-hover:text-slate-800"
               }`}
             />
           </motion.div>
           
           <span className={`text-sm font-semibold transition-colors duration-200 ${
-            isActive("/recycler/profile") ? "text-white" : "group-hover:text-white"
+            isActive("/recycler/profile") ? "text-slate-900" : "group-hover:text-slate-900"
           }`}>
             Profile
           </span>
         </motion.button>
+
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-slate-700 py-3"
+        >
+          <span className="text-base font-medium">{sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}</span>
+        </button>
       </div>
     </aside>
   );
