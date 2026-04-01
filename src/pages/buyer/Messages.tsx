@@ -108,7 +108,7 @@ const BuyerMessages = () => {
   // Chat view
   if (selectedChat) {
     return (
-      <div className="min-h-screen bg-background/40 flex flex-col">
+      <div className="h-screen bg-background/40 flex flex-col overflow-hidden">
         <PageBackground type="oceanPlastic" overlay="bg-foreground/50" />
         {/* Chat header */}
         <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">

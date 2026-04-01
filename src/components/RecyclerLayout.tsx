@@ -46,7 +46,7 @@ export function RecyclerLayout() {
         
         {/* Main Content Area with Background */}
         <main
-          className={`flex-1 h-screen w-full overflow-hidden relative z-0 transition-[margin-left] duration-200 ease-out ${
+          className={`flex-1 h-screen w-full overflow-y-auto overflow-x-hidden relative z-0 transition-[margin-left] duration-200 ease-out ${
             sidebarOpen ? "ml-80" : "ml-20"
           }`}
         >

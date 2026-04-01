@@ -205,9 +205,9 @@ const RecyclerDashboard = () => {
               className="absolute top-8 right-8 bottom-8 w-72 pointer-events-auto flex flex-col"
               style={selectedAction !== null ? { pointerEvents: "none", visibility: "hidden", opacity: 0 } : { pointerEvents: "auto", visibility: "visible", opacity: 1 }}
             >
-                <div className="rounded-2xl bg-[#020617]/90 backdrop-blur-3xl border border-emerald-500/20 shadow-2xl overflow-hidden flex flex-col flex-1 p-5">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-white drop-shadow-md mb-4">Active Challenges</h3>
-                  <div className="space-y-3 overflow-y-auto flex-1 pr-2 scrollbar-emerald">
+                <div className="rounded-2xl bg-[#020617]/90 backdrop-blur-3xl border border-emerald-500/20 shadow-2xl flex flex-col flex-1 p-5 min-h-0">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-white drop-shadow-md mb-4 shrink-0">Active Challenges</h3>
+                  <div className="space-y-3 overflow-y-auto flex-1 pr-2 scrollbar-emerald min-h-0">
                     {challenges && challenges.length > 0 ? (
                       challenges.slice(0, 4).map((challenge: any, idx: number) => (
                         <motion.div
