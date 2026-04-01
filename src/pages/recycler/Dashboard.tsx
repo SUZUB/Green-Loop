@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion, animate, useMotionValue } from "framer-motion";
+import { motion, animate, useMotionValue, AnimatePresence } from "framer-motion";
 import { PageBackground } from "@/components/PageBackground";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -79,6 +79,22 @@ const RecyclerDashboard = () => {
   const [simulatedCoinDelta, setSimulatedCoinDelta] = useState(0);
   const [selectedAction, setSelectedAction] = useState<QuickActionKey | null>(null);
   const [claimedRewards, setClaimedRewards] = useState<Record<string, boolean>>({ bottle: false, ticket: false, voucher: false });
+  const [showChallengesPanel, setShowChallengesPanel] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem("recycler_dashboard_show_challenges_panel");
+      return stored === null ? true : stored === "true";
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("recycler_dashboard_show_challenges_panel", String(showChallengesPanel));
+    } catch {
+      // ignore
+    }
+  }, [showChallengesPanel]);
 
   const handleHeatmapEvent = (payload: { latestPoint: HeatmapPoint; liveCount: number; coinBalanceDelta: number }) => {
     setLatestHeatmapEvent(payload.latestPoint);
@@ -160,68 +176,85 @@ const RecyclerDashboard = () => {
       <div className="absolute inset-0 z-0">
         <PickerMapTracker
           role="recycler"
-          title="EcoSync Live Map"
+          title="GREEN LOOP live map"
           onHeatmapEvent={handleHeatmapEvent}
         />
       </div>
 
       {/* Content overlay container - z-50 for UI elements, map is z-0 */}
       <div className="absolute inset-0 z-50 pointer-events-none overflow-visible">
+        <div className="absolute top-6 left-6 pointer-events-auto">
+          <Button
+            size="sm"
+            variant="outline"
+            className="bg-[#020617]/70 text-white border-white/10 hover:bg-[#020617]/90"
+            onClick={() => setShowChallengesPanel((v) => !v)}
+          >
+            {showChallengesPanel ? "Hide Dashboard" : "Show Dashboard"}
+          </Button>
+        </div>
         
         {/* RIGHT SIDE: Challenges Panel - Narrower & Tall */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4 }}
-          className="absolute top-8 right-8 bottom-8 w-72 pointer-events-auto flex flex-col"
-          style={selectedAction !== null ? { pointerEvents: "none", visibility: "hidden", opacity: 0 } : { pointerEvents: "auto", visibility: "visible", opacity: 1 }}
-        >
-            <div className="rounded-2xl bg-[#020617]/90 backdrop-blur-3xl border border-emerald-500/20 shadow-2xl overflow-hidden flex flex-col flex-1 p-5">
-              <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-white drop-shadow-md mb-4">Active Challenges</h3>
-              <div className="space-y-3 overflow-y-auto flex-1 pr-2 scrollbar-emerald">
-                {challenges && challenges.length > 0 ? (
-                  challenges.slice(0, 4).map((challenge: any, idx: number) => (
-                    <motion.div
-                      key={challenge.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.1 }}
-                      className="rounded-lg bg-slate-900/50 backdrop-blur-md border border-white/10 hover:border-emerald-500/30 p-3 transition-all hover:shadow-[0_0_12px_rgba(16,185,129,0.2)]"
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-white uppercase tracking-[0.1em] drop-shadow-md truncate">{challenge.title}</p>
-                          <p className="text-xs font-bold text-emerald-400 drop-shadow-md mt-0.5">{challenge.targetImpactKg} kg</p>
-                        </div>
-                        <Trophy className="h-4 w-4 text-amber-400 flex-shrink-0 drop-shadow-md shadow-[0_0_8px_rgba(16,185,129,0.3)]" />
+        <AnimatePresence>
+          {showChallengesPanel && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.25 }}
+              className="absolute top-8 right-8 bottom-8 w-72 pointer-events-auto flex flex-col"
+              style={selectedAction !== null ? { pointerEvents: "none", visibility: "hidden", opacity: 0 } : { pointerEvents: "auto", visibility: "visible", opacity: 1 }}
+            >
+                <div className="rounded-2xl bg-[#020617]/90 backdrop-blur-3xl border border-emerald-500/20 shadow-2xl overflow-hidden flex flex-col flex-1 p-5">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-white drop-shadow-md mb-4">Active Challenges</h3>
+                  <div className="space-y-3 overflow-y-auto flex-1 pr-2 scrollbar-emerald">
+                    {challenges && challenges.length > 0 ? (
+                      challenges.slice(0, 4).map((challenge: any, idx: number) => (
+                        <motion.div
+                          key={challenge.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.1 }}
+                          className="rounded-lg bg-slate-900/50 backdrop-blur-md border border-white/10 hover:border-emerald-500/30 p-3 transition-all hover:shadow-[0_0_12px_rgba(16,185,129,0.2)]"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-white uppercase tracking-[0.1em] drop-shadow-md truncate">{challenge.title}</p>
+                              <p className="text-xs font-bold text-emerald-400 drop-shadow-md mt-0.5">{challenge.targetImpactKg} kg</p>
+                            </div>
+                            <Trophy className="h-4 w-4 text-amber-400 flex-shrink-0 drop-shadow-md shadow-[0_0_8px_rgba(16,185,129,0.3)]" />
+                          </div>
+                          <div className="mb-2">
+                            <Progress value={Math.min(100, (challenge.participants || 1) * 20)} className="h-1.5 rounded-full bg-white/10" />
+                            <p className="text-xs text-slate-400 drop-shadow-md mt-1">{challenge.participants || 1} participants</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold rounded-lg text-xs h-7 shadow-lg hover:shadow-[0_0_16px_rgba(16,185,129,0.4)]"
+                            disabled={challenge.joined}
+                            onClick={async () => {
+                              const joined = await joinChallenge(challenge.id);
+                              toast({
+                                title: joined ? "🎯 Challenge joined!" : "Already joined",
+                                description: joined ? `You're now participating in ${challenge.title}` : `You're already in ${challenge.title}.`,
+                                variant: joined ? "success" : "default",
+                              });
+                            }}
+                          >
+                            {challenge.joined ? "Joined" : <>Join <ChevronRight className="h-3 w-3 ml-1" /></>}
+                          </Button>
+                        </motion.div>
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-center h-20 text-center">
+                        <p className="text-xs text-slate-400 drop-shadow-md">No active challenges</p>
                       </div>
-                      <div className="mb-2">
-                        <Progress value={Math.min(100, (challenge.participants || 1) * 20)} className="h-1.5 rounded-full bg-white/10" />
-                        <p className="text-xs text-slate-400 drop-shadow-md mt-1">{challenge.participants || 1} participants</p>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold rounded-lg text-xs h-7 shadow-lg hover:shadow-[0_0_16px_rgba(16,185,129,0.4)]"
-                        onClick={() => {
-                          joinChallenge(challenge.id);
-                          toast({
-                            title: "🎯 Challenge joined!",
-                            description: `You're now participating in ${challenge.title}`,
-                          });
-                        }}
-                      >
-                        Join <ChevronRight className="h-3 w-3 ml-1" />
-                      </Button>
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="flex items-center justify-center h-20 text-center">
-                    <p className="text-xs text-slate-400 drop-shadow-md">No active challenges</p>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
+                </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {selectedAction && selectedAction !== "rewards" && (
           <motion.div

@@ -26,7 +26,7 @@ const Referral = () => {
   };
 
   const shareCode = () => {
-    const text = `Join me on RecycleHub and earn ₹5 bonus! Use my code: ${referralCode} 🌍♻️ Together we can save the planet!`;
+    const text = `Join me on GREEN LOOP and earn ₹5 bonus! Use my code: ${referralCode} 🌍♻️ Together we can save the planet!`;
     if (navigator.share) {
       navigator.share({ text });
     } else {

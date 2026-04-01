@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useEco } from "@/context/EcoContext";
 import {
   Leaf, Droplets, Fish, Factory, ArrowRight, Shield, Recycle,
   TrendingUp, Award, Flame, Star, Users, TreePine, Zap, Globe, CheckCircle2
@@ -13,6 +14,12 @@ import heroIntroPollutionBg from "@/assets/hero-intro-pollution-bg.jpg";
 import heroPollutionBg from "@/assets/hero-pollution-bg.jpg";
 import heroRecyclingBg from "@/assets/hero-recycling-process-bg.jpg";
 import heroWasteBg from "@/assets/hero-plastic-waste-bg.jpg";
+
+const safetyPoints = [
+  "Background-verified pickup partners",
+  "Contactless pickup available on request",
+  "Live status tracking and secure records",
+];
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -48,6 +55,56 @@ const achievements = [
   { icon: Flame, title: "Consistency King", desc: "10 consecutive pickups", emoji: "🔥", color: "bg-earth" },
 ];
 
+const ParallaxBg = ({ src, speed = 0.3, overlay = "bg-foreground/50" }: { src: string; speed?: number; overlay?: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const y = useTransform(scrollYProgress, [0, 1], [`-${speed * 80}px`, `${speed * 80}px`]);
+
+  return (
+    <div ref={ref} className="absolute inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden="true">
+      <motion.img src={src} alt="" className="absolute -top-[10%] h-[120%] w-full object-cover" style={{ y }} />
+      <div className={`absolute inset-0 ${overlay}`} />
+    </div>
+  );
+};
+
+const WhyRecycleSection = () => {
+  const { state } = useEco();
+  const cards = [
+    { icon: Users, value: state.globalUsersActive, suffix: "+", label: "Recyclers Active", color: "bg-leaf" },
+    { icon: Recycle, value: Math.floor(state.globalPlasticCollected / 1000), suffix: "+", label: "Tons Recycled", color: "bg-primary" },
+    { icon: Star, value: state.globalPointsDistributed, suffix: "", label: "Points Distributed", color: "bg-secondary" },
+    { icon: TreePine, value: Math.floor(state.globalPlasticCollected / 100), suffix: "+", label: "Trees Equivalent", color: "bg-earth" },
+  ];
+
+  return (
+    <section id="why-recycle" className="relative py-20 overflow-hidden">
+      <ParallaxBg src={heroPollutionBg} speed={0.25} overlay="bg-foreground/70" />
+      <div className="container mx-auto px-4 relative z-10">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl md:text-5xl font-display font-bold text-primary-foreground">Why Recycle With GREEN LOOP?</h2>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {cards.map((c) => (
+            <div key={c.label} className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm p-4">
+              <LiveCounter end={c.value} suffix={c.suffix} label={c.label} icon={c.icon} color={c.color} />
+            </div>
+          ))}
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {achievements.map((a) => (
+            <div key={a.title} className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm p-4 text-primary-foreground">
+              <div className="text-2xl mb-2">{a.emoji}</div>
+              <p className="font-semibold">{a.title}</p>
+              <p className="text-sm text-primary-foreground/75">{a.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const Index = () => {
   const navigate = useNavigate();
   const { state } = useEco();
@@ -66,7 +123,7 @@ const Index = () => {
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
           <div className="flex items-center gap-2">
             <Recycle className="h-7 w-7 text-primary" />
-            <span className="text-xl font-display font-bold text-foreground">RecycleHub</span>
+            <span className="text-xl font-display font-bold text-foreground">GREEN LOOP</span>
           </div>
           <Button variant="default" size="sm" onClick={() => navigate("/role-select")}>
             Get Started
@@ -267,9 +324,9 @@ const Index = () => {
         <div className="container mx-auto px-4 text-center text-muted-foreground">
           <div className="flex items-center justify-center gap-2 mb-3">
             <Recycle className="h-5 w-5 text-primary" />
-            <span className="font-display font-semibold text-foreground">RecycleHub</span>
+            <span className="font-display font-semibold text-foreground">GREEN LOOP</span>
           </div>
-          <p className="text-sm">© 2026 RecycleHub. Making the world cleaner, one pickup at a time.</p>
+          <p className="text-sm">© 2026 GREEN LOOP. Making the world cleaner, one pickup at a time.</p>
         </div>
       </footer>
     </div>

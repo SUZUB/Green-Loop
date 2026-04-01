@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowRight, MapPin, Users, Sparkles, Target } from "lucide-react";
 import { useRecycleHub } from "@/hooks/useRecycleHub";
 import type { ChallengeCard, HeatmapReport } from "@/hooks/useRecycleHub";
+import { useToast } from "@/hooks/use-toast";
 
 const pickerIcon = L.divIcon({
   html: '<div style="width:24px;height:24px;border-radius:50%;background:#38bdf8;border:2px solid #ffffff;box-shadow:0 0 12px rgba(56,189,248,0.55);"></div>',
@@ -55,6 +56,7 @@ function HeatmapLayer({ points }: { points: [number, number, number][] }) {
 }
 
 export default function ChallengesPage() {
+  const { toast } = useToast();
   const {
     heatmapReports,
     heatmapPoints,
@@ -68,6 +70,7 @@ export default function ChallengesPage() {
   } = useRecycleHub();
 
   const [map, setMap] = useState<L.Map | null>(null);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
 
   useEffect(() => {
     const originalHtmlOverflow = document.documentElement.style.overflow;
@@ -111,7 +114,7 @@ export default function ChallengesPage() {
       <div className="container mx-auto max-w-7xl h-full px-4 py-6 flex flex-col min-h-0">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between shrink-0">
           <div>
-            <p className="text-sm uppercase tracking-[0.3em] text-slate-400">RecycleHub Coordination</p>
+            <p className="text-sm uppercase tracking-[0.3em] text-slate-400">GREEN LOOP coordination</p>
             <h1 className="text-3xl sm:text-4xl font-display font-bold">Community Cleanup Challenges</h1>
             <p className="mt-3 max-w-2xl text-sm text-slate-300">
               Coordinate the next volunteer mission with live heatmap intelligence, challenge meetups, and patrol locations.
@@ -208,8 +211,25 @@ export default function ChallengesPage() {
                           </div>
                         </div>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
-                          <Button size="sm" variant={challenge.joined ? "secondary" : "default"} onClick={() => joinChallenge(challenge.id)}>
-                            {challenge.joined ? "Leave" : "Join"}
+                          <Button
+                            size="sm"
+                            variant={challenge.joined ? "secondary" : "default"}
+                            disabled={challenge.joined || joiningId === challenge.id}
+                            onClick={async (event) => {
+                              event.stopPropagation();
+                              setJoiningId(challenge.id);
+                              const joined = await joinChallenge(challenge.id);
+                              setJoiningId(null);
+                              toast({
+                                title: joined ? "Joined challenge" : "Already joined",
+                                description: joined
+                                  ? "You’re in. Your rewards and stats are updating now."
+                                  : "You’ve already joined this challenge.",
+                                variant: joined ? "success" : "default",
+                              });
+                            }}
+                          >
+                            {joiningId === challenge.id ? "Joining..." : challenge.joined ? "Joined" : "Join"}
                           </Button>
                           <Button size="sm" variant="outline" className="gap-2" onClick={() => setSelectedChallenge(challenge.id)}>
                             Map Location <ArrowRight className="h-4 w-4" />

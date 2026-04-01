@@ -54,7 +54,7 @@ export const CertificateModal = ({
       const canvas = await generateCanvas();
       if (!canvas) return;
       const link = document.createElement("a");
-      link.download = `RecycleHub-Certificate-${customName.replace(/\s+/g, "-")}.jpg`;
+      link.download = `GreenLoop-Certificate-${customName.replace(/\s+/g, "-")}.jpg`;
       link.href = canvas.toDataURL("image/jpeg", 0.95);
       link.click();
     } catch (e) {
@@ -64,7 +64,7 @@ export const CertificateModal = ({
     }
   };
 
-  const shareText = `🏆 I earned a RecycleHub Achievement Certificate!\n\n♻️ ${totalRecycled} plastic recycled\n🌿 ${co2Saved} CO₂ prevented\n🐬 ${animalsSaved} marine animals saved\n\nBadges: ${badges.map((b) => `${b.icon} ${b.name}`).join(", ")}\n\nJoin me on RecycleHub and make a difference! 🌍`;
+  const shareText = `🏆 I earned a GREEN LOOP achievement certificate!\n\n♻️ ${totalRecycled} plastic recycled\n🌿 ${co2Saved} CO₂ prevented\n🐬 ${animalsSaved} marine animals saved\n\nBadges: ${badges.map((b) => `${b.icon} ${b.name}`).join(", ")}\n\nJoin me on GREEN LOOP and make a difference! 🌍`;
 
   const shareToWhatsApp = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank");
@@ -85,7 +85,7 @@ export const CertificateModal = ({
         if (canvas) {
           canvas.toBlob(async (blob) => {
             if (!blob) return;
-            const file = new File([blob], "RecycleHub-Certificate.jpg", { type: "image/jpeg" });
+            const file = new File([blob], "GreenLoop-Certificate.jpg", { type: "image/jpeg" });
             await navigator.share({ text: shareText, files: [file] });
           }, "image/jpeg", 0.95);
         }
@@ -183,7 +183,7 @@ export const CertificateModal = ({
                   className="text-sm sm:text-base font-bold tracking-[0.3em] uppercase"
                   style={{ color: "rgba(74, 222, 128, 0.9)" }}
                 >
-                  RecycleHub
+                  GREEN LOOP
                 </span>
                 <span className="text-2xl">♻️</span>
               </div>
@@ -280,7 +280,7 @@ export const CertificateModal = ({
               <div className="text-right">
                 <div className="w-16 sm:w-20 h-0.5 mb-1 ml-auto" style={{ background: "rgba(74, 222, 128, 0.4)" }} />
                 <p className="text-[8px] sm:text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>
-                  RecycleHub Team
+                  GREEN LOOP team
                 </p>
               </div>
             </div>

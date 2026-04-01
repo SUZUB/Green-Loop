@@ -44,6 +44,7 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
   const [timeline, setTimeline] = useState(timeFrames[1]);
   const [delivery, setDelivery] = useState(deliveryOptions[0]);
   const [notes, setNotes] = useState("");
+  const [recentRequests, setRecentRequests] = useState<SourcingRequest[]>([]);
   const stepLabels = ["Request", "Supplier", "Confirm"];
 
   const handlePostRequest = () => {
@@ -63,6 +64,7 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
     };
 
     onPostRequest(request);
+    setRecentRequests((prev) => [request, ...prev].slice(0, 8));
     setStep(1);
     setQuantity(5);
     setNotes("");
@@ -206,24 +208,24 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
               <span>Request</span>
               <span>{new Date().toLocaleDateString()}</span>
             </div>
-            <h3 className="mt-3 text-lg font-semibold text-white">{quantity} {unit} of {material}</h3>
-            <p className="mt-2 text-sm text-slate-300">Supplier: {supplier}</p>
-            <p className="text-sm text-slate-300">Location: {location}</p>
-            <p className="text-sm text-slate-300">Need by: {timeline}</p>
-            <p className="text-sm text-slate-300">Delivery: {delivery}</p>
-            {notes && <p className="mt-3 text-sm text-slate-300">Notes: {notes}</p>}
+            <h3 className="mt-3 text-lg font-semibold text-slate-900">{quantity} {unit} of {material}</h3>
+            <p className="mt-2 text-sm text-slate-600">Supplier: {supplier}</p>
+            <p className="text-sm text-slate-600">Location: {location}</p>
+            <p className="text-sm text-slate-600">Need by: {timeline}</p>
+            <p className="text-sm text-slate-600">Delivery: {delivery}</p>
+            {notes && <p className="mt-3 text-sm text-slate-600">Notes: {notes}</p>}
           </div>
-          <div className="grid grid-cols-3 gap-3 text-sm text-slate-300">
-            <div className="rounded-3xl bg-emerald-900/60 p-4">
-              <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+          <div className="grid grid-cols-3 gap-3 text-sm text-slate-700">
+            <div className="rounded-3xl bg-emerald-50 border border-emerald-100 p-4">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
               <p className="mt-2">Pending supplier review</p>
             </div>
-            <div className="rounded-3xl bg-slate-900/60 p-4">
-              <MapPin className="h-5 w-5 text-cyan-300" />
+            <div className="rounded-3xl bg-sky-50 border border-sky-100 p-4">
+              <MapPin className="h-5 w-5 text-sky-600" />
               <p className="mt-2">Live sourcing route</p>
             </div>
-            <div className="rounded-3xl bg-slate-900/60 p-4">
-              <Truck className="h-5 w-5 text-teal-300" />
+            <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4">
+              <Truck className="h-5 w-5 text-slate-600" />
               <p className="mt-2">Local network fulfillment</p>
             </div>
           </div>
@@ -239,19 +241,19 @@ export function SourcingForm({ onPostRequest }: { onPostRequest: (request: Sourc
       )}
 
       {recentRequests.length > 0 && (
-        <div className="mt-6 rounded-3xl bg-slate-950/70 p-4 border border-white/10">
+        <div className="mt-6 rounded-3xl bg-background/80 p-4 border border-border backdrop-blur">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs uppercase tracking-[0.28em] text-slate-400">Recent requests</span>
-            <span className="text-xs text-emerald-200">{recentRequests.length} saved</span>
+            <span className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Recent requests</span>
+            <span className="text-xs text-emerald">{recentRequests.length} saved</span>
           </div>
           <div className="space-y-3">
             {recentRequests.slice(0, 3).map((request) => (
-              <div key={request.id} className="rounded-2xl border border-white/10 bg-slate-950/80 p-3">
+              <div key={request.id} className="rounded-2xl border border-border bg-card p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-white">{request.title}</p>
-                  <span className="text-[11px] uppercase tracking-[0.24em] text-slate-400">{request.status}</span>
+                  <p className="text-sm font-semibold">{request.title}</p>
+                  <span className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">{request.status}</span>
                 </div>
-                <p className="text-xs text-slate-400">Supplier: {request.supplier}</p>
+                <p className="text-xs text-muted-foreground">Supplier: {request.supplier}</p>
               </div>
             ))}
           </div>

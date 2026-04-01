@@ -1,5 +1,5 @@
 /**
- * EcoSync Mock Data
+ * GREEN LOOP mock data
  * Comprehensive seed data for development and testing
  * Contains: 50+ heatmap points, 8 challenges, 15 transactions, 5 sourcing requests, 10+ leaderboard users
  */

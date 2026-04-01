@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import {
-  Home, Zap, ShoppingCart, User, Wallet, Trophy, Leaf, Award, Share2, BookOpen, Users, CalendarPlus,
+  Home, Zap, User, Wallet, Trophy, Leaf, Award, Share2, BookOpen, Users, CalendarPlus,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useRef, useEffect, useState } from "react";
@@ -35,6 +35,7 @@ const recyclerToolsItems: NavigationItem[] = [
   { key: "wallet", icon: Wallet, label: "Wallet", path: "/recycler/wallet" },
   { key: "achievements", icon: Award, label: "Achievements", path: "/recycler/achievements" },
   { key: "referrals", icon: Share2, label: "Referrals", path: "/recycler/referral" },
+  { key: "aiCamera", icon: ScanLine, label: "AI Scanner", path: "/recycler/ai-camera" },
 ];
 
 const quickActionItems: QuickActionItem[] = [
@@ -76,7 +77,8 @@ export function RecyclerSidebar({
         key={item.key}
         onClick={() => navigate(item.path)}
         whileHover={{ x: 4 }}
-        className={`w-full relative flex items-center gap-4 px-4 py-3 rounded-xl transition-colors duration-150 group ${
+        title={!sidebarOpen ? item.label : undefined}
+        className={`w-full relative flex items-center ${sidebarOpen ? "gap-4 px-4" : "justify-center px-2"} py-3 rounded-xl transition-colors duration-150 group ${
           active ? "bg-emerald-100/80 text-slate-900" : "text-slate-700 hover:bg-slate-100"
         }`}
       >
@@ -95,11 +97,13 @@ export function RecyclerSidebar({
         </motion.div>
         
         {/* Label */}
-        <span className={`text-sm font-semibold transition-colors duration-200 ${
-          active ? "text-slate-900" : "group-hover:text-slate-900"
-        }`}>
-          {item.label}
-        </span>
+        {sidebarOpen && (
+          <span className={`text-sm font-semibold transition-colors duration-200 ${
+            active ? "text-slate-900" : "group-hover:text-slate-900"
+          }`}>
+            {item.label}
+          </span>
+        )}
       </motion.button>
     );
   };
@@ -127,8 +131,8 @@ export function RecyclerSidebar({
   };
 
   return (
-    <aside className="h-full min-h-screen p-6 space-y-8 bg-slate-50 overflow-y-auto scrollbar-hide text-slate-900 flex flex-col border-r border-slate-200">
-      {/* EcoSync Logo */}
+    <aside className={`h-full min-h-screen ${sidebarOpen ? "p-6 space-y-8" : "p-3 space-y-4"} bg-slate-50 overflow-y-auto scrollbar-hide text-slate-900 flex flex-col border-r border-slate-200 transition-all duration-200`}>
+      {/* GREEN LOOP brand */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -136,15 +140,17 @@ export function RecyclerSidebar({
         className="flex items-center gap-3 pt-2"
       >
         <EcoLogo size="sm" />
-        <div>
-          <p className="text-sm font-bold text-slate-900 tracking-wider">EcoSync</p>
-          <p className="text-xs text-slate-500">Green Loop</p>
-        </div>
+        {sidebarOpen && (
+          <div>
+            <p className="text-sm font-bold text-slate-900 tracking-wider">GREEN LOOP</p>
+            <p className="text-xs text-slate-500">Recycler</p>
+          </div>
+        )}
       </motion.div>
 
       {/* Dashboard Section */}
       <nav className="space-y-3">
-        <h3 className="text-slate-500 text-sm font-semibold px-2 mb-3">Navigation</h3>
+        {sidebarOpen && <h3 className="text-slate-500 text-sm font-semibold px-2 mb-3">Navigation</h3>}
         <div className="space-y-2">
           {dashboardItems.map(renderNavItem)}
         </div>
@@ -152,25 +158,30 @@ export function RecyclerSidebar({
 
       {/* Recycler Tools Section */}
       <nav className="space-y-3">
-        <h3 className="text-slate-500 uppercase tracking-widest text-[10px] font-semibold px-4 mb-3">
-          Recycler Tools
-        </h3>
+        {sidebarOpen && (
+          <h3 className="text-slate-500 uppercase tracking-widest text-[10px] font-semibold px-4 mb-3">
+            Recycler Tools
+          </h3>
+        )}
         <div className="space-y-2">
           {recyclerToolsItems.map(renderNavItem)}
         </div>
       </nav>
 
       {/* Quick Actions Section */}
-      <div className="space-y-3">
-        <h3 className="text-slate-500 uppercase tracking-widest text-[10px] font-semibold px-4 mb-3">
-          Operations
-        </h3>
-        <div className="grid grid-cols-2 gap-3">
-          {quickActionItems.map(renderQuickActionTile)}
+      {sidebarOpen && (
+        <div className="space-y-3">
+          <h3 className="text-slate-500 uppercase tracking-widest text-[10px] font-semibold px-4 mb-3">
+            Operations
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            {quickActionItems.map(renderQuickActionTile)}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Sidebar Stats Section */}
+      {sidebarOpen && (
       <div className="space-y-3 pt-4 border-t border-slate-200">
         <h3 className="text-slate-500 text-sm font-semibold px-2 mb-3">Live Metrics</h3>
         <div className="space-y-3">
@@ -239,13 +250,15 @@ export function RecyclerSidebar({
           </motion.div>
         </div>
       </div>
+      )}
 
       {/* Profile Section */}
       <div className="pt-4 border-t border-slate-200 mt-auto space-y-2">
         <motion.button
           whileHover={{ x: 4 }}
           onClick={() => navigate("/recycler/profile")}
-          className={`w-full relative flex items-center gap-4 px-4 py-3 rounded-lg transition-all duration-200 group ${
+          title={!sidebarOpen ? "Profile" : undefined}
+          className={`w-full relative flex items-center ${sidebarOpen ? "gap-4 px-4" : "justify-center px-2"} py-3 rounded-lg transition-all duration-200 group ${
             isActive("/recycler/profile")
               ? "bg-emerald-100/80 text-slate-900"
               : "text-slate-700 hover:bg-slate-100"
@@ -264,20 +277,22 @@ export function RecyclerSidebar({
             />
           </motion.div>
           
-          <span className={`text-sm font-semibold transition-colors duration-200 ${
-            isActive("/recycler/profile") ? "text-slate-900" : "group-hover:text-slate-900"
-          }`}>
-            Profile
-          </span>
+          {sidebarOpen && (
+            <span className={`text-sm font-semibold transition-colors duration-200 ${
+              isActive("/recycler/profile") ? "text-slate-900" : "group-hover:text-slate-900"
+            }`}>
+              Profile
+            </span>
+          )}
         </motion.button>
 
-        <button
+        {sidebarOpen && <button
           type="button"
           onClick={onToggleSidebar}
           className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-slate-700 py-3"
         >
           <span className="text-base font-medium">{sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}</span>
-        </button>
+        </button>}
       </div>
     </aside>
   );

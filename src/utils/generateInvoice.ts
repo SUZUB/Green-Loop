@@ -17,7 +17,7 @@ export function generateInvoice(order: InvoiceOrder) {
   const titleY = 60;
 
   doc.setFontSize(18);
-  doc.text("RecycleHub Invoice", margin, titleY);
+  doc.text("GREEN LOOP invoice", margin, titleY);
   doc.setFontSize(10);
   doc.text(`Order ID: ${order.orderId}`, margin, titleY + 30);
   doc.text(`Buyer: ${order.buyerName}`, margin, titleY + 45);
@@ -37,7 +37,7 @@ export function generateInvoice(order: InvoiceOrder) {
   doc.text(`Total Credits Spent: ${order.totalCredits}`, margin, titleY + 190);
 
   doc.setFontSize(9);
-  doc.text("Thank you for using RecycleHub. This invoice confirms the completed order and is part of your enterprise procurement record.", margin, titleY + 240, { maxWidth: 520 });
+  doc.text("Thank you for using GREEN LOOP. This invoice confirms the completed order and is part of your enterprise procurement record.", margin, titleY + 240, { maxWidth: 520 });
 
   doc.save(`${order.orderId}-invoice.pdf`);
 }

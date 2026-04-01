@@ -123,9 +123,9 @@ function ecoReducer(state: EcoState, action: EcoAction): EcoState {
         ...state,
         userProfile: { ...state.userProfile, ...action.profile },
       };
-    case "ADD_PLASTIC_COLLECTION":
+    case "ADD_PLASTIC_COLLECTION": {
       const newPlasticCollected = state.globalPlasticCollected + action.amount;
-      const newCO2Saved = state.globalCO2Saved + (action.amount * 0.5); // 100g plastic = 50g CO2
+      const newCO2Saved = state.globalCO2Saved + action.amount * 0.5; // 100g plastic = 50g CO2
       const newPoints = Math.floor(action.amount * 0.01); // Earn points for plastic
       return {
         ...state,
@@ -133,11 +133,50 @@ function ecoReducer(state: EcoState, action: EcoAction): EcoState {
         globalCO2Saved: newCO2Saved,
         globalPointsDistributed: state.globalPointsDistributed + newPoints,
         userBalance: state.userBalance + newPoints,
-        userImpactKg: state.userImpactKg + (action.amount / 1000), // Convert g to kg
+        userImpactKg: state.userImpactKg + action.amount / 1000, // Convert g to kg
       };
+    }
     default:
       return state;
   }
+}
+
+function sanitizeEcoState(parsed: unknown, init: EcoState): EcoState {
+  if (!parsed || typeof parsed !== "object") return init;
+  const p = parsed as Record<string, unknown>;
+  const rawProfile =
+    p.userProfile && typeof p.userProfile === "object" ? (p.userProfile as Record<string, unknown>) : {};
+
+  return {
+    ...init,
+    userBalance: typeof p.userBalance === "number" && Number.isFinite(p.userBalance) ? p.userBalance : init.userBalance,
+    userImpactKg: typeof p.userImpactKg === "number" && Number.isFinite(p.userImpactKg) ? p.userImpactKg : init.userImpactKg,
+    activeChallenges: Array.isArray(p.activeChallenges) ? (p.activeChallenges as Challenge[]) : init.activeChallenges,
+    transactionHistory: Array.isArray(p.transactionHistory) ? (p.transactionHistory as Transaction[]) : init.transactionHistory,
+    leaderboardData: Array.isArray(p.leaderboardData) ? (p.leaderboardData as LeaderboardUser[]) : init.leaderboardData,
+    globalPlasticCollected:
+      typeof p.globalPlasticCollected === "number" && Number.isFinite(p.globalPlasticCollected)
+        ? p.globalPlasticCollected
+        : init.globalPlasticCollected,
+    globalCO2Saved: typeof p.globalCO2Saved === "number" && Number.isFinite(p.globalCO2Saved) ? p.globalCO2Saved : init.globalCO2Saved,
+    globalUsersActive:
+      typeof p.globalUsersActive === "number" && Number.isFinite(p.globalUsersActive) ? p.globalUsersActive : init.globalUsersActive,
+    globalPointsDistributed:
+      typeof p.globalPointsDistributed === "number" && Number.isFinite(p.globalPointsDistributed)
+        ? p.globalPointsDistributed
+        : init.globalPointsDistributed,
+    userProfile: {
+      ...init.userProfile,
+      name: typeof rawProfile.name === "string" ? rawProfile.name : init.userProfile.name,
+      email: typeof rawProfile.email === "string" ? rawProfile.email : init.userProfile.email,
+      phone: typeof rawProfile.phone === "string" ? rawProfile.phone : init.userProfile.phone,
+      address: typeof rawProfile.address === "string" ? rawProfile.address : init.userProfile.address,
+      role:
+        rawProfile.role === "recycler" || rawProfile.role === "picker" || rawProfile.role === "buyer" || rawProfile.role === null
+          ? (rawProfile.role as EcoState["userProfile"]["role"])
+          : init.userProfile.role,
+    },
+  };
 }
 
 const EcoContext = createContext<{
@@ -149,14 +188,20 @@ export function EcoProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(ecoReducer, initialState, (init) => {
     try {
       const stored = localStorage.getItem("eco_sync_state");
-      return stored ? { ...init, ...JSON.parse(stored) } : init;
+      if (!stored) return init;
+      const parsed = JSON.parse(stored) as unknown;
+      return sanitizeEcoState(parsed, init);
     } catch {
       return init;
     }
   });
 
   useEffect(() => {
-    localStorage.setItem("eco_sync_state", JSON.stringify(state));
+    try {
+      localStorage.setItem("eco_sync_state", JSON.stringify(state));
+    } catch {
+      // Private mode / quota — do not break the app
+    }
   }, [state]);
 
   return (

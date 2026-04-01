@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useRecycleHub } from "@/hooks/useRecycleHub";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Wallet as WalletIcon, ArrowUpRight, ArrowDownLeft, CreditCard, Heart, Crown, Coins } from "lucide-react";
+import { Loader2, Wallet as WalletIcon, ArrowUpRight, ArrowDownLeft, CreditCard, Heart, Crown } from "lucide-react";
 
 const plans = [
   { name: "Silver", cost: 500, color: "bg-muted", perks: ["₹50 subscription discount", "Basic offers access"] },
@@ -26,14 +26,25 @@ const ngos = [
 
 const WalletPage = () => {
   const { toast } = useToast();
-  const { userBalance, fullTransactionList } = useRecycleHub();
+  const { userBalance, fullTransactionList, depositPoints, withdrawPoints } = useRecycleHub();
   const [tab, setTab] = useState("overview");
   const [cashoutAmount, setCashoutAmount] = useState("");
+  const [depositAmount, setDepositAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
 
   const handleCashout = () => {
-    const pts = parseInt(cashoutAmount);
-    if (!pts || pts < 1000) {
+    const pts = Math.floor(Number(cashoutAmount));
+    if (!Number.isFinite(pts) || pts < 1000) {
       toast({ title: "Minimum 1,000 points required", description: "Keep recycling to earn more!", variant: "destructive" });
+      return;
+    }
+    if (pts > userBalance) {
+      toast({ title: "Insufficient balance", description: "Reduce the cash-out amount to your available points.", variant: "destructive" });
+      return;
+    }
+    const res = withdrawPoints(pts, "Cash-out requested");
+    if (!res.ok) {
+      toast({ title: "Cash-out failed", description: res.error, variant: "destructive" });
       return;
     }
     toast({ title: "Cash-out requested!", description: `₹${pts / 10} will be transferred in 24-48 hours.` });
@@ -64,6 +75,67 @@ const WalletPage = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-2">
+            <Card className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Deposit points</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="e.g. 250"
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const amount = Math.floor(Number(depositAmount));
+                        const res = depositPoints(amount, "Manual deposit");
+                        if (!res.ok) {
+                          toast({ title: "Deposit failed", description: res.error, variant: "destructive" });
+                          return;
+                        }
+                        toast({ title: "Deposit successful", description: `+${amount} points added.`, variant: "success" });
+                        setDepositAmount("");
+                      }}
+                    >
+                      <ArrowUpRight className="h-4 w-4 mr-1.5" /> Deposit
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Withdraw points</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="e.g. 100"
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const amount = Math.floor(Number(withdrawAmount));
+                        const res = withdrawPoints(amount, "Manual withdrawal");
+                        if (!res.ok) {
+                          toast({ title: "Withdrawal failed", description: res.error, variant: "destructive" });
+                          return;
+                        }
+                        toast({ title: "Withdrawal successful", description: `-${amount} points deducted.`, variant: "success" });
+                        setWithdrawAmount("");
+                      }}
+                    >
+                      <ArrowDownLeft className="h-4 w-4 mr-1.5" /> Withdraw
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                These controls are for testing wallet operations end-to-end (validation, balance updates, history).
+              </p>
+            </Card>
+
             {fullTransactionList.length === 0 ? (
               <p className="text-center text-muted-foreground py-8 text-sm">No transactions yet.</p>
             ) : (
@@ -72,14 +144,16 @@ const WalletPage = () => {
                   <Card className="p-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center bg-accent text-primary">
-                        <ArrowDownLeft className="h-4 w-4" />
+                        {tx.amount >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
                       </div>
                       <div>
                         <p className="text-sm font-medium">{tx.description}</p>
                         <p className="text-[10px] text-muted-foreground">{new Date(tx.createdAt).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}</p>
                       </div>
                     </div>
-                    <span className="font-display font-bold text-sm text-primary">+{tx.amount}</span>
+                    <span className={`font-display font-bold text-sm ${tx.amount >= 0 ? "text-primary" : "text-destructive"}`}>
+                      {tx.amount >= 0 ? `+${tx.amount}` : tx.amount}
+                    </span>
                   </Card>
                 </motion.div>
               ))
@@ -121,8 +195,8 @@ const WalletPage = () => {
                         <li key={p} className="text-xs text-muted-foreground flex items-center gap-1.5"><span className="text-primary">✓</span> {p}</li>
                       ))}
                     </ul>
-                    <Button size="sm" variant={stats.coinBalance >= plan.cost ? "default" : "outline"} className="w-full" disabled={stats.coinBalance < plan.cost}>
-                      {stats.coinBalance >= plan.cost ? "Subscribe" : `Need ${plan.cost - stats.coinBalance} more pts`}
+                    <Button size="sm" variant={userBalance >= plan.cost ? "default" : "outline"} className="w-full" disabled={userBalance < plan.cost}>
+                      {userBalance >= plan.cost ? "Subscribe" : `Need ${plan.cost - userBalance} more pts`}
                     </Button>
                   </Card>
                 </motion.div>

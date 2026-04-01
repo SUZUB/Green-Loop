@@ -27,8 +27,8 @@ const getBadgeProgress = (key: string, stats: ReturnType<typeof useUserStats>) =
 
 const handleShare = (badge: { name: string; unlocked: boolean }) => {
   const text = badge.unlocked
-    ? `I just earned the "${badge.name}" badge on RecycleHub! 🎉 Join me in saving the planet 🌍`
-    : `I'm working towards the "${badge.name}" badge on RecycleHub! 💪🌍`;
+    ? `I just earned the "${badge.name}" badge on GREEN LOOP! 🎉 Join me in saving the planet 🌍`
+    : `I'm working towards the "${badge.name}" badge on GREEN LOOP! 💪🌍`;
   if (navigator.share) {
     navigator.share({ text });
   } else {

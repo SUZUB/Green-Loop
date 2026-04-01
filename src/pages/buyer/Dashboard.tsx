@@ -49,7 +49,7 @@
 //         <div className="container mx-auto flex items-center justify-between h-14 px-4">
 //           <div className="flex items-center gap-2">
 //             <Factory className="h-6 w-6 text-earth" />
-//             <span className="font-display font-bold text-lg">RecycleHub</span>
+//             <span className="font-display font-bold text-lg">GREEN LOOP</span>
 //             <span className="text-xs bg-earth/10 text-earth px-2 py-0.5 rounded-full font-medium">Buyer</span>
 //           </div>
 //           <Button variant="ghost" size="sm" onClick={() => navigate("/buyer/profile")}>
@@ -131,8 +131,8 @@
 // export default BuyerDashboard;
 
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { PageBackground } from "@/components/PageBackground";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -146,7 +146,7 @@ import {
 } from "@/components/ui/table";
 import {
   Factory, ClipboardList, Package, Leaf, BarChart3,
-  Plus, Eye, MapPin, IndianRupee, ArrowRight, ShoppingCart,
+  Plus, Eye, MapPin, IndianRupee, ArrowRight, ShoppingCart, Sparkles,
 } from "lucide-react";
 
 const quickActions = [
@@ -166,6 +166,22 @@ const recentOrders = [
 const BuyerDashboard = () => {
   const navigate = useNavigate();
   const { userBalance, availableMarketCredits } = useRecycleHub();
+  const [showDashboard, setShowDashboard] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem("buyer_dashboard_show_sections");
+      return stored === null ? true : stored === "true";
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("buyer_dashboard_show_sections", String(showDashboard));
+    } catch {
+      // ignore
+    }
+  }, [showDashboard]);
 
   const metrics = [
     { icon: Leaf, label: "Carbon Credit Portfolio", value: userBalance.toLocaleString("en-IN"), color: "bg-emerald", accent: true },
@@ -182,12 +198,17 @@ const BuyerDashboard = () => {
         <div className="container mx-auto flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-2">
             <Factory className="h-6 w-6 text-earth" />
-            <span className="font-display font-bold text-lg">RecycleHub</span>
+            <span className="font-display font-bold text-lg">GREEN LOOP</span>
             <span className="text-xs bg-earth/10 text-earth px-2 py-0.5 rounded-full font-medium">Buyer</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate("/buyer/profile")}>
-            Profile
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowDashboard((v) => !v)}>
+              {showDashboard ? "Hide Dashboard" : "Show Dashboard"}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/buyer/profile")}>
+              Profile
+            </Button>
+          </div>
         </div>
       </nav>
 
@@ -197,41 +218,112 @@ const BuyerDashboard = () => {
           <p className="text-muted-foreground text-sm">Manage plastic sourcing & carbon credit operations</p>
         </div>
 
-        {/* Metrics */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          {metrics.map((m) => (
-            <div key={m.label}>
-              <Card className={`p-4 ${m.accent ? "border-l-4 border-l-emerald" : ""}`}>
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg ${m.color} flex items-center justify-center`}>
-                    <m.icon className="h-5 w-5 text-primary-foreground" />
+        {/* Spotlight CTA: make carbon credit purchase the primary action for buyers */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="mb-6"
+        >
+          <Card className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-elevated">
+            <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+            <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-black/10 blur-2xl" />
+            <div className="relative p-6 sm:p-8">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-2xl">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Featured for Buyers
                   </div>
-                  <div>
-                    <p className={`text-lg font-display font-bold ${m.accent ? "text-emerald" : ""}`}>{m.value}</p>
-                    <p className="text-xs text-muted-foreground">{m.label}</p>
+                  <h2 className="mt-4 text-3xl sm:text-4xl font-display font-bold tracking-tight">
+                    Buy Carbon Credits
+                  </h2>
+                  <p className="mt-3 text-sm text-white/80">
+                    Lock in credits from the live market and grow your portfolio. Your balance updates instantly after purchase.
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-3 text-sm">
+                    <span className="rounded-full bg-white/10 px-3 py-2">
+                      Balance: <span className="font-semibold">{userBalance.toLocaleString("en-IN")}</span> credits
+                    </span>
+                    <span className="rounded-full bg-white/10 px-3 py-2">
+                      Live supply: <span className="font-semibold">{availableMarketCredits}</span> credits
+                    </span>
                   </div>
                 </div>
-              </Card>
-            </div>
-          ))}
-        </div>
 
-        {/* Quick Actions */}
-        <h2 className="text-lg font-display font-bold mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-2 gap-3 mb-8">
-          {quickActions.map((action) => (
-            <button
-              key={action.label}
-              onClick={() => navigate(action.path)}
-              className="w-full p-4 rounded-xl bg-card border border-border hover:shadow-soft transition-all flex items-center gap-3"
-            >
-              <div className={`w-10 h-10 rounded-lg ${action.color} flex items-center justify-center shrink-0`}>
-                <action.icon className="h-5 w-5 text-primary-foreground" />
+                <div className="flex flex-col gap-3 sm:min-w-[260px]">
+                  <Button
+                    size="lg"
+                    className="h-12 w-full bg-white text-emerald-800 hover:bg-white/90 font-semibold"
+                    onClick={() => navigate("/buyer/carbon-market")}
+                  >
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Buy Carbon Credits
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-12 w-full border-white/30 bg-transparent text-white hover:bg-white/10"
+                    onClick={() => navigate("/buyer/analytics")}
+                  >
+                    View portfolio analytics <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                  <p className="text-xs text-white/70">
+                    Tip: Purchases show up in your wallet history immediately.
+                  </p>
+                </div>
               </div>
-              <span className="text-sm font-medium text-foreground">{action.label}</span>
-            </button>
-          ))}
-        </div>
+            </div>
+          </Card>
+        </motion.div>
+
+        <AnimatePresence initial={false}>
+          {showDashboard && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden"
+            >
+              {/* Metrics */}
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                {metrics.map((m) => (
+                  <div key={m.label}>
+                    <Card className={`p-4 ${m.accent ? "border-l-4 border-l-emerald" : ""}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg ${m.color} flex items-center justify-center`}>
+                          <m.icon className="h-5 w-5 text-primary-foreground" />
+                        </div>
+                        <div>
+                          <p className={`text-lg font-display font-bold ${m.accent ? "text-emerald" : ""}`}>{m.value}</p>
+                          <p className="text-xs text-muted-foreground">{m.label}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+                ))}
+              </div>
+
+              {/* Quick Actions */}
+              <h2 className="text-lg font-display font-bold mb-3">Quick Actions</h2>
+              <div className="grid grid-cols-2 gap-3 mb-8">
+                {quickActions.map((action) => (
+                  <button
+                    key={action.label}
+                    onClick={() => navigate(action.path)}
+                    className="w-full p-4 rounded-xl bg-card border border-border hover:shadow-soft transition-all flex items-center gap-3"
+                  >
+                    <div className={`w-10 h-10 rounded-lg ${action.color} flex items-center justify-center shrink-0`}>
+                      <action.icon className="h-5 w-5 text-primary-foreground" />
+                    </div>
+                    <span className="text-sm font-medium text-foreground">{action.label}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Recent Orders */}
         <div className="flex items-center justify-between mb-3">

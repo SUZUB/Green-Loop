@@ -16,8 +16,8 @@ const roles = [
   {
     icon: Truck,
     emoji: "👤",
-    title: "I'm a Plastic Collector",
-    description: "Collect plastic from recyclers. Manage pickups, track routes, and grow your collection network.",
+    title: "I'm a Picker (collector)",
+    description: "Collect plastic from households and recyclers. Manage pickups, track routes, and grow your network.",
     path: "/auth/login?role=picker",
     color: "bg-ocean",
   },

@@ -30,7 +30,7 @@ const initialOrders: BuyerOrder[] = [
     totalCredits: 70,
     status: "In Transit",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    buyerName: "RecycleHub Buyer",
+    buyerName: "Green Loop buyer",
   },
   {
     orderId: "ORD-002",
@@ -40,7 +40,7 @@ const initialOrders: BuyerOrder[] = [
     totalCredits: 150,
     status: "Delivered",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(),
-    buyerName: "RecycleHub Buyer",
+    buyerName: "Green Loop buyer",
   },
   {
     orderId: "ORD-003",
@@ -50,7 +50,7 @@ const initialOrders: BuyerOrder[] = [
     totalCredits: 240,
     status: "Completed",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
-    buyerName: "RecycleHub Buyer",
+    buyerName: "Green Loop buyer",
   },
 ];
 
@@ -86,7 +86,7 @@ export default function OrderTracker() {
         totalCredits: Math.max(1, Math.round(Number(item.totalAmount.replace(/[^0-9]/g, "")) / 10)),
         status: item.status,
         createdAt: new Date().toISOString(),
-        buyerName: "RecycleHub Buyer",
+        buyerName: "Green Loop buyer",
       }))
     );
   }, [trackOrders]);

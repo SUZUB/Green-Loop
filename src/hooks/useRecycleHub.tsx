@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { mockLeaderboardData, LeaderboardUser } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
 
 export type HeatmapReport = {
   id: string;
@@ -94,11 +95,14 @@ const MARKET_STORAGE_KEYS = {
   transactions: "recyclehub_market_transactions",
   globalMetrics: "recyclehub_global_metrics",
   challenges: "recyclehub_challenges",
+  joinedChallengeIds: "recyclehub_joined_challenge_ids",
   sourcingRequests: "recyclehub_sourcing_requests",
   trackOrders: "recyclehub_track_orders",
   recentActivity: "recyclehub_recent_activity",
   topRecyclers: "recyclehub_top_recyclers",
   quickActionStats: "recyclehub_quick_action_stats",
+  pickupQueue: "recyclehub_pickup_queue",
+  completedPickups: "recyclehub_completed_pickups",
 };
 
 const generateTransactionId = () => `#RH-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -156,6 +160,18 @@ export interface OrderTracker {
   orderDate: string;
   eta: string;
   invoiceReady: boolean;
+}
+
+export interface PickupBooking {
+  id: string;
+  userName: string;
+  date: string;
+  timeSlot: string;
+  weightKg: number;
+  address: string;
+  status: "Pending" | "Completed";
+  pointsAwarded: number;
+  createdAt: string;
 }
 
 export interface GlobalMetrics {
@@ -724,11 +740,13 @@ interface RecycleHubContextValue {
   selectedChallenge: ChallengeCard | null;
   setSelectedChallengeId: (id: string) => void;
   setSelectedChallenge: (id: string) => void;
-  joinChallenge: (id: string) => void;
+  joinChallenge: (id: string) => Promise<boolean>;
   globalMetrics: GlobalMetrics;
   supplierApplications: SupplierApplication[];
   sourcingRequests: SourcingRequest[];
   trackOrders: OrderTracker[];
+  pickupQueue: PickupBooking[];
+  completedPickups: PickupBooking[];
   recentActivity: RecentActivityItem[];
   topRecyclers: TopRecycler[];
   leaderboardUsers: LeaderboardUser[];
@@ -737,9 +755,13 @@ interface RecycleHubContextValue {
   fullTransactionList: MarketTransaction[];
   quickActionStats: QuickActionStats;
   addTransaction: (transaction: Omit<MarketTransaction, "id" | "createdAt">) => void;
+  depositPoints: (amount: number, note?: string) => { ok: true } | { ok: false; error: string };
+  withdrawPoints: (amount: number, note?: string) => { ok: true } | { ok: false; error: string };
   addSourcingRequest: (request: Omit<SourcingRequest, "id">) => SourcingRequest;
   addTrackOrder: (order: Omit<OrderTracker, "id"> & { id?: string }) => OrderTracker;
   updateTrackOrderStatus: (orderId: string, status: OrderTracker["status"]) => void;
+  bookPickup: (payload: Omit<PickupBooking, "id" | "status" | "pointsAwarded" | "createdAt">) => PickupBooking;
+  completePickup: (bookingId: string, actualWeightKg?: number) => PickupBooking | null;
   completePurchase: (quantity: number) => boolean;
   refreshAllData: () => void;
 }
@@ -754,6 +776,8 @@ function useProvideRecycleHub() {
   const [supplierApplications, setSupplierApplications] = useState<SupplierApplication[]>(INITIAL_SUPPLIER_APPLICATIONS);
   const [sourcingRequests, setSourcingRequests] = useState<SourcingRequest[]>(INITIAL_SOURCING_REQUESTS);
   const [trackOrders, setTrackOrders] = useState<OrderTracker[]>(INITIAL_TRACK_ORDERS);
+  const [pickupQueue, setPickupQueue] = useState<PickupBooking[]>([]);
+  const [completedPickups, setCompletedPickups] = useState<PickupBooking[]>([]);
   const [recentActivity, setRecentActivity] = useState<RecentActivityItem[]>(INITIAL_RECENT_ACTIVITY);
   const [topRecyclers, setTopRecyclers] = useState<TopRecycler[]>(INITIAL_TOP_RECYCLERS);
   const [leaderboardUsers, setLeaderboardUsers] = useState<LeaderboardUser[]>(INITIAL_LEADERBOARD_USERS);
@@ -761,6 +785,8 @@ function useProvideRecycleHub() {
   const [userBalance, setUserBalance] = useState<number>(840);
   const [availableMarketCredits, setAvailableMarketCredits] = useState<number>(200);
   const [fullTransactionList, setFullTransactionList] = useState<MarketTransaction[]>(INITIAL_MARKET_TRANSACTIONS);
+  const [joinedChallengeIds, setJoinedChallengeIds] = useState<Set<string>>(new Set());
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const storedBalance = window.localStorage.getItem(MARKET_STORAGE_KEYS.userBalance);
@@ -805,6 +831,18 @@ function useProvideRecycleHub() {
         }
       } catch {
         setChallenges(INITIAL_CHALLENGES);
+      }
+    }
+
+    const storedJoined = window.localStorage.getItem(MARKET_STORAGE_KEYS.joinedChallengeIds);
+    if (storedJoined) {
+      try {
+        const parsed = JSON.parse(storedJoined) as string[];
+        if (Array.isArray(parsed)) {
+          setJoinedChallengeIds(new Set(parsed));
+        }
+      } catch {
+        setJoinedChallengeIds(new Set());
       }
     }
 
@@ -865,6 +903,58 @@ function useProvideRecycleHub() {
         setTrackOrders(INITIAL_TRACK_ORDERS);
       }
     }
+
+    const storedPickupQueue = window.localStorage.getItem(MARKET_STORAGE_KEYS.pickupQueue);
+    if (storedPickupQueue) {
+      try {
+        const parsed = JSON.parse(storedPickupQueue) as PickupBooking[];
+        if (Array.isArray(parsed)) setPickupQueue(parsed);
+      } catch {
+        setPickupQueue([]);
+      }
+    }
+
+    const storedCompletedPickups = window.localStorage.getItem(MARKET_STORAGE_KEYS.completedPickups);
+    if (storedCompletedPickups) {
+      try {
+        const parsed = JSON.parse(storedCompletedPickups) as PickupBooking[];
+        if (Array.isArray(parsed)) setCompletedPickups(parsed);
+      } catch {
+        setCompletedPickups([]);
+      }
+    }
+  }, []);
+
+  // If authenticated, load wallet balance from the database profile so it stays consistent across devices.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProfileBalance() {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const user = auth.user;
+        if (!user) {
+          if (!cancelled) setAuthUserId(null);
+          return;
+        }
+        if (!cancelled) setAuthUserId(user.id);
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("coin_balance")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (!cancelled && typeof profile?.coin_balance === "number") {
+          setUserBalance(profile.coin_balance);
+        }
+      } catch {
+        // If Supabase isn't available, localStorage-backed balance still works.
+      }
+    }
+    loadProfileBalance();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -923,6 +1013,23 @@ function useProvideRecycleHub() {
     window.localStorage.setItem(MARKET_STORAGE_KEYS.userBalance, String(userBalance));
   }, [userBalance]);
 
+  // Persist wallet balance back to Supabase when logged in.
+  useEffect(() => {
+    if (!authUserId) return;
+    const timeout = window.setTimeout(async () => {
+      try {
+        await supabase
+          .from("profiles")
+          .update({ coin_balance: userBalance })
+          .eq("id", authUserId);
+      } catch {
+        // Non-fatal; local state remains correct.
+      }
+    }, 350);
+
+    return () => window.clearTimeout(timeout);
+  }, [authUserId, userBalance]);
+
   useEffect(() => {
     window.localStorage.setItem(MARKET_STORAGE_KEYS.availableMarketCredits, String(availableMarketCredits));
   }, [availableMarketCredits]);
@@ -938,6 +1045,18 @@ function useProvideRecycleHub() {
   useEffect(() => {
     window.localStorage.setItem(MARKET_STORAGE_KEYS.challenges, JSON.stringify(challenges));
   }, [challenges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.joinedChallengeIds, JSON.stringify(Array.from(joinedChallengeIds)));
+  }, [joinedChallengeIds]);
+
+  // Ensure joined state survives refresh even if challenges are reseeded/updated.
+  useEffect(() => {
+    if (joinedChallengeIds.size === 0) return;
+    setChallenges((prev) =>
+      prev.map((challenge) => (joinedChallengeIds.has(challenge.id) ? { ...challenge, joined: true } : challenge))
+    );
+  }, [joinedChallengeIds]);
 
   useEffect(() => {
     window.localStorage.setItem(MARKET_STORAGE_KEYS.recentActivity, JSON.stringify(recentActivity));
@@ -958,6 +1077,14 @@ function useProvideRecycleHub() {
   useEffect(() => {
     window.localStorage.setItem(MARKET_STORAGE_KEYS.trackOrders, JSON.stringify(trackOrders));
   }, [trackOrders]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.pickupQueue, JSON.stringify(pickupQueue));
+  }, [pickupQueue]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.completedPickups, JSON.stringify(completedPickups));
+  }, [completedPickups]);
 
   // Sync userBalance with quickActionStats and leaderboard
   useEffect(() => {
@@ -1053,91 +1180,108 @@ function useProvideRecycleHub() {
     }));
   };
 
-  const joinChallenge = (challengeId: string) => {
-    setChallenges((prev) => {
-      const newChallenges = prev.map((challenge) =>
+  const joinChallenge = async (challengeId: string) => {
+    // Prevent duplicate joins (double-clicks, rapid taps, re-renders).
+    if (joinedChallengeIds.has(challengeId)) return false;
+
+    const current = challenges.find((c) => c.id === challengeId);
+    if (!current) return false;
+
+    // Mark joined immediately for UI feedback.
+    setJoinedChallengeIds((prev) => new Set(prev).add(challengeId));
+    setChallenges((prev) =>
+      prev.map((challenge) =>
         challenge.id === challengeId
           ? {
               ...challenge,
-              joined: !challenge.joined,
-              completed: !challenge.joined && challenge.participants + 1 >= 50,
-              participants: challenge.joined ? Math.max(challenge.participants - 1, 0) : challenge.participants + 1,
+              joined: true,
+              completed: challenge.participants + 1 >= 50,
+              participants: challenge.participants + 1,
             }
           : challenge
-      );
+      )
+    );
 
-      const updatedChallenge = newChallenges.find((c) => c.id === challengeId);
-      if (updatedChallenge?.joined) {
-        setHeatmapReports((reports) => reduceHeatmapIntensity(reports, updatedChallenge));
-        
-        // Add reward credits
-        const rewardCredits = updatedChallenge.points * 10;
-        setUserBalance((prev) => prev + rewardCredits);
-        
-        // Increment live pickers
-        setGlobalMetrics((prev) => ({
-          ...prev,
-          livePickersOnline: Math.min(prev.livePickersOnline + 1, 99),
-        }));
-        
-        // Increment my impact (add 50% of target impact)
-        const impactIncrease = Math.round(updatedChallenge.targetImpactKg * 0.5);
-        setQuickActionStats((prev) => ({
-          ...prev,
-          wallet: {
-            ...prev.wallet,
-            lastEarned: rewardCredits,
-          },
-          myImpact: {
-            totalWasteDivertedKg: prev.myImpact.totalWasteDivertedKg + impactIncrease,
-          },
-        }));
-        
-        // Update global metrics with impact
-        setGlobalMetrics((prev) => ({
-          ...prev,
-          totalPlasticRecycledKg: Number((prev.totalPlasticRecycledKg + impactIncrease).toFixed(1)),
-        }));
-        
-        addTransaction({
-          description: `Challenge joined: ${updatedChallenge.title}`,
-          amount: rewardCredits,
-          status: "Complete",
-          type: "Challenge Reward",
-        });
-      } else if (!updatedChallenge?.joined) {
-        // When leaving challenge, decrement live pickers and impact
-        const prevChallenge = prev.find((c) => c.id === challengeId);
-        if (prevChallenge?.joined) {
-          setGlobalMetrics((prev) => ({
-            ...prev,
-            livePickersOnline: Math.max(prev.livePickersOnline - 1, 0),
-          }));
-          
-          const impactDecrease = Math.round(prevChallenge.targetImpactKg * 0.5);
-          setQuickActionStats((prev) => ({
-            ...prev,
-            myImpact: {
-              totalWasteDivertedKg: Math.max(prev.myImpact.totalWasteDivertedKg - impactDecrease, 0),
-            },
-          }));
-        }
-      }
+    // Side-effects (rewards + metrics) are applied once.
+    const rewardCredits = current.points * 10;
+    setHeatmapReports((reports) => reduceHeatmapIntensity(reports, current));
+    setUserBalance((prev) => prev + rewardCredits);
+    setGlobalMetrics((prev) => ({ ...prev, livePickersOnline: Math.min(prev.livePickersOnline + 1, 99) }));
 
-      if (updatedChallenge?.completed && !prev.find((c) => c.id === challengeId)?.completed) {
-        setGlobalMetrics((current) => ({
-          ...current,
-          totalPlasticRecycledKg: Number((current.totalPlasticRecycledKg + updatedChallenge.reportsFiledKg).toFixed(1)),
-          totalCarbonCredits: current.totalCarbonCredits + Math.max(1, Math.round(updatedChallenge.reportsFiledKg * 0.4)),
-        }));
-      }
-
-      return newChallenges;
+    const impactIncrease = Math.round(current.targetImpactKg * 0.5);
+    setQuickActionStats((prev) => ({
+      ...prev,
+      wallet: { ...prev.wallet, lastEarned: rewardCredits },
+      myImpact: { totalWasteDivertedKg: prev.myImpact.totalWasteDivertedKg + impactIncrease },
+    }));
+    setGlobalMetrics((prev) => ({
+      ...prev,
+      totalPlasticRecycledKg: Number((prev.totalPlasticRecycledKg + impactIncrease).toFixed(1)),
+    }));
+    addTransaction({
+      description: `Challenge joined: ${current.title}`,
+      amount: rewardCredits,
+      status: "Complete",
+      type: "Challenge Reward",
     });
+
+    // Database persistence: update authenticated user's profile counters where available.
+    // Challenge membership is persisted locally (no challenges table in current schema).
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth.user;
+      if (user) {
+        const { data: existing } = await supabase
+          .from("profiles")
+          .select("coin_balance,total_points")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        const coinBalance = (existing?.coin_balance ?? 0) + rewardCredits;
+        const totalPoints = (existing?.total_points ?? 0) + rewardCredits;
+
+        // Persist the reward so it survives refresh and shows up cross-app.
+        await supabase
+          .from("profiles")
+          .update({ coin_balance: coinBalance, total_points: totalPoints })
+          .eq("id", user.id);
+      }
+    } catch {
+      // If offline / no auth, local state still works and is persisted via localStorage.
+    }
+
+    return true;
   };
 
   const addTransaction = (transaction: Omit<MarketTransaction, "id" | "createdAt">) => {
     setFullTransactionList((prev) => [createMarketTransaction(transaction), ...prev].slice(0, 50));
+  };
+
+  const depositPoints = (amount: number, note?: string) => {
+    if (!Number.isFinite(amount) || amount <= 0) return { ok: false as const, error: "Deposit amount must be greater than 0." };
+    const rounded = Math.floor(amount);
+    setUserBalance((prev) => prev + rounded);
+    addTransaction({
+      description: note?.trim() ? note.trim() : "Wallet deposit",
+      amount: rounded,
+      status: "Complete",
+      type: "Market Stream",
+    });
+    return { ok: true as const };
+  };
+
+  const withdrawPoints = (amount: number, note?: string) => {
+    if (!Number.isFinite(amount) || amount <= 0) return { ok: false as const, error: "Withdrawal amount must be greater than 0." };
+    const rounded = Math.floor(amount);
+    if (rounded > userBalance) return { ok: false as const, error: "Insufficient balance." };
+    setUserBalance((prev) => prev - rounded);
+    addTransaction({
+      description: note?.trim() ? note.trim() : "Wallet withdrawal",
+      amount: -rounded,
+      status: "Complete",
+      type: "Market Stream",
+    });
+    return { ok: true as const };
   };
 
   const addSourcingRequest = (request: Omit<SourcingRequest, "id">) => {
@@ -1160,6 +1304,66 @@ function useProvideRecycleHub() {
 
   const updateTrackOrderStatus = (orderId: string, status: OrderTracker["status"]) => {
     setTrackOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+  };
+
+  const bookPickup = (payload: Omit<PickupBooking, "id" | "status" | "pointsAwarded" | "createdAt">) => {
+    const booking: PickupBooking = {
+      id: `PK-${Date.now().toString(36).toUpperCase()}`,
+      ...payload,
+      status: "Pending",
+      pointsAwarded: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    setPickupQueue((prev) => [booking, ...prev]);
+    setQuickActionStats((prev) => ({
+      ...prev,
+      bookPickup: {
+        nextScheduled: `${booking.date}, ${booking.timeSlot}`,
+        recentPickups: prev.bookPickup.recentPickups + 1,
+      },
+    }));
+    setRecentActivity((prev) => [
+      { id: `act-${Date.now()}`, desc: `${booking.userName} booked a pickup`, pts: "+0", date: "Today" },
+      ...prev,
+    ].slice(0, 20));
+
+    return booking;
+  };
+
+  const completePickup = (bookingId: string, actualWeightKg?: number) => {
+    const existing = pickupQueue.find((p) => p.id === bookingId);
+    if (!existing) return null;
+
+    const weight = Math.max(0.1, actualWeightKg ?? existing.weightKg);
+    const points = Math.round(weight * 100);
+    const completed: PickupBooking = { ...existing, weightKg: weight, status: "Completed", pointsAwarded: points };
+
+    setPickupQueue((prev) => prev.filter((p) => p.id !== bookingId));
+    setCompletedPickups((prev) => [completed, ...prev]);
+    setUserBalance((prev) => prev + points);
+    setQuickActionStats((prev) => ({
+      ...prev,
+      myImpact: { totalWasteDivertedKg: prev.myImpact.totalWasteDivertedKg + weight },
+      wallet: { ...prev.wallet, balance: prev.wallet.balance + points, lastEarned: points },
+    }));
+    setGlobalMetrics((prev) => ({
+      ...prev,
+      totalPlasticRecycledKg: Number((prev.totalPlasticRecycledKg + weight).toFixed(1)),
+      totalCarbonCredits: prev.totalCarbonCredits + Math.max(1, Math.round(weight * 0.4)),
+    }));
+    setRecentActivity((prev) => [
+      { id: `act-${Date.now()}`, desc: `${existing.userName} completed pickup`, pts: `+${points}`, date: "Today" },
+      ...prev,
+    ].slice(0, 20));
+    addTransaction({
+      description: `Pickup completed (${weight.toFixed(1)} kg)`,
+      amount: points,
+      status: "Complete",
+      type: "Market Stream",
+    });
+
+    return completed;
   };
 
   const completePurchase = (quantity: number) => {
@@ -1192,6 +1396,8 @@ function useProvideRecycleHub() {
     supplierApplications,
     sourcingRequests,
     trackOrders,
+    pickupQueue,
+    completedPickups,
     userBalance,
     availableMarketCredits,
     fullTransactionList,
@@ -1200,9 +1406,13 @@ function useProvideRecycleHub() {
     leaderboardUsers,
     quickActionStats,
     addTransaction,
+    depositPoints,
+    withdrawPoints,
     addSourcingRequest,
     addTrackOrder,
     updateTrackOrderStatus,
+    bookPickup,
+    completePickup,
     completePurchase,
     refreshAllData,
   };

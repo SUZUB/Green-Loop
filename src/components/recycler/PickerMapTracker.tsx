@@ -295,8 +295,8 @@ export function PickerMapTracker({ role = "picker", title, onHeatmapEvent }: Pic
                   <p className="text-xs text-slate-600">{challenge.locationName}</p>
                   <p className="text-xs text-slate-600">{challenge.meetupTime}</p>
                   <p className="text-xs text-slate-600">Reward: {challenge.points} points</p>
-                  <Button size="sm" className="w-full" onClick={() => joinChallenge(challenge.id)}>
-                    {challenge.joined ? "Leave Challenge" : "Join Challenge"}
+                  <Button size="sm" className="w-full" onClick={() => joinChallenge(challenge.id)} disabled={challenge.joined}>
+                    {challenge.joined ? "Joined" : "Join Challenge"}
                   </Button>
                 </div>
               </Popup>

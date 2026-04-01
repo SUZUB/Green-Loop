@@ -20,7 +20,7 @@ const Leaderboard = () => {
   }, [leaderboardUsers]);
 
   const handleShare = (rank: number, name: string) => {
-    const text = `I'm ranked #${rank}${name === "You" ? "" : ` as ${name}`} on EcoSync! Join me in saving the planet 🌍 #EcoSync`;
+    const text = `I'm ranked #${rank}${name === "You" ? "" : ` as ${name}`} on GREEN LOOP! Join me in saving the planet 🌍 #GreenLoop`;
     if (navigator.share) {
       navigator.share({ text });
     } else {

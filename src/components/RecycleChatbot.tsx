@@ -20,7 +20,7 @@ export const RecycleChatbot = () => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: "Hi! I'm RecycleBot 🤖 — your recycling assistant. Ask me anything about plastic recycling, earning points, or how RecycleHub works!" },
+    { role: "assistant", content: "Hi! I'm RecycleBot 🤖 — your recycling assistant for GREEN LOOP. Ask me about plastic recycling, earning points, or how the app works!" },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageBackground } from "@/components/PageBackground";
 import { useNavigate } from "react-router-dom";
+import { useRecycleHub } from "@/hooks/useRecycleHub";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,7 @@ const Booking = () => {
   const [editingLocation, setEditingLocation] = useState(false);
   const [tempAddress, setTempAddress] = useState("");
   const bookingId = `RH-${Date.now().toString(36).toUpperCase()}`;
+  const { bookPickup } = useRecycleHub();
 
   // Generate smart suggestions based on selected date
   const getSmartSuggestions = () => {
@@ -351,7 +353,18 @@ const Booking = () => {
                 className="w-full gap-2"
                 size="lg"
                 disabled={!canProceed()}
-                onClick={() => setStep(step + 1)}
+                onClick={() => {
+                  if (step === 3) {
+                    bookPickup({
+                      userName: "Recycler User",
+                      date: date?.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) ?? "Today",
+                      timeSlot: timeSlot || "morning",
+                      weightKg: Number(weight),
+                      address,
+                    });
+                  }
+                  setStep(step + 1);
+                }}
               >
                 {step === 3 ? "Confirm Booking" : "Continue"} <ArrowRight className="h-4 w-4" />
               </Button>

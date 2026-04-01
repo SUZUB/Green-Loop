@@ -1,6 +1,6 @@
-# Green Loop (RecycleHub) — Web App
+# GREEN LOOP — Web App
 
-Green Loop is a multi-role recycling platform UI built with React + TypeScript. It includes role-based dashboards (Recycler / Picker / Buyer), maps + heatmaps, community challenges, a wallet/market experience, and an AI recycling assistant powered by a Supabase Edge Function.
+GREEN LOOP is a multi-role recycling platform UI built with React + TypeScript. It includes role-based dashboards (Recycler / Picker / Buyer), maps + heatmaps, community challenges, a wallet/market experience, picker AI plastic scanning (camera + upload), and an AI recycling assistant powered by a Supabase Edge Function.
 
 ## Tech stack
 
@@ -34,6 +34,9 @@ Create a `.env` file in the project root (same folder as `package.json`):
 VITE_SUPABASE_URL="https://<project-ref>.supabase.co"
 VITE_SUPABASE_PUBLISHABLE_KEY="<anon key>"
 VITE_SUPABASE_PROJECT_ID="<project-ref>"
+
+# Optional: POST multipart form field "image" — return JSON matching ScanAnalysis in src/lib/plasticScan/analysis.ts
+# VITE_PLASTIC_VISION_URL="https://your-api.example.com/plastic-scan"
 ```
 
 Important:
@@ -82,6 +85,10 @@ If the key is missing, the chatbot will return an error.
 
 - **Picker**
   - `/picker/dashboard`
+  - `/picker/profile`
+  - `/picker/ai-camera` (AI plastic scanner — picker only)
+
+Note: `/recycler/ai-camera` redirects to `/picker/ai-camera`.
 
 - **Buyer**
   - `/buyer/dashboard`

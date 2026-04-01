@@ -69,7 +69,16 @@ const Signup = () => {
       if (data.user) {
         await supabase
           .from("profiles")
-          .update({ full_name: form.name })
+          .update({
+            full_name: form.name,
+            role,
+            coin_balance: 0,
+            total_pickups: 0,
+            total_points: 0,
+            total_recycled_kg: 0,
+            referral_count: 0,
+            consecutive_weeks: 0,
+          })
           .eq("id", data.user.id);
       }
 

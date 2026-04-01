@@ -31,7 +31,7 @@ const Impact = () => {
   ];
 
   const handleShare = async () => {
-    const text = `I've recycled ${stats.totalRecycledKg} kg of plastic with RecycleHub, saving ${stats.co2Saved.toFixed(1)} kg of CO₂ and protecting ~${stats.animalsSaved} sea animals! 🌍🐬 Join me! #RecycleHub`;
+    const text = `I've recycled ${stats.totalRecycledKg} kg of plastic with GREEN LOOP, saving ${stats.co2Saved.toFixed(1)} kg of CO₂ and protecting ~${stats.animalsSaved} sea animals! 🌍🐬 Join me! #GreenLoop`;
     try {
       if (navigator.share) {
         await navigator.share({ text });
@@ -107,7 +107,7 @@ const Impact = () => {
         {/* Global impact */}
         <h2 className="text-lg font-display font-bold mb-3">Global Impact</h2>
         <Card className="p-5 bg-card-gradient">
-          <p className="text-sm text-muted-foreground mb-3">Together, RecycleHub community has:</p>
+          <p className="text-sm text-muted-foreground mb-3">Together, the GREEN LOOP community has:</p>
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-sm">♻️ Plastic recycled</span>

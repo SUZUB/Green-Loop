@@ -92,10 +92,26 @@ const Dashboard = () => {
   usePickerGeolocation(); // Start broadcasting location every 10s
   const [tab, setTab] = useState("schedule");
   const [bottomTab, setBottomTab] = useState("dashboard");
+  const [showDashboard, setShowDashboard] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem("picker_dashboard_show_sections");
+      return stored === null ? true : stored === "true";
+    } catch {
+      return true;
+    }
+  });
   const [selectedPickup, setSelectedPickup] = useState<Pickup | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [pickupHistory, setPickupHistory] = useState<{ id: string; recycler_id: string; weight_kg: number; points_earned: number; created_at: string }[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("picker_dashboard_show_sections", String(showDashboard));
+    } catch {
+      // ignore
+    }
+  }, [showDashboard]);
 
   useEffect(() => {
     if (bottomTab === "earnings") {
@@ -131,70 +147,92 @@ const Dashboard = () => {
             <Truck className="h-5 w-5 text-ocean" />
             <span className="font-display font-semibold">Picker Dashboard</span>
           </div>
+          <div className="ml-auto">
+            <Button variant="outline" size="sm" onClick={() => setShowDashboard((v) => !v)}>
+              {showDashboard ? "Hide Dashboard" : "Show Dashboard"}
+            </Button>
+          </div>
         </div>
       </nav>
 
       <div className="container mx-auto px-4 py-6 pb-24 max-w-lg">
         {bottomTab === "dashboard" && (
-          <div className="mb-5">
-            <PickerMapTracker role="recycler" title="Live Giver Heatmap" />
-          </div>
-        )}
-        {bottomTab === "dashboard" && (
-          <>
-            {/* Scan QR Button */}
-            <Button
-              className="w-full mb-4 gap-2 h-12 text-base"
-              onClick={() => setShowScanner(true)}
-            >
-              <ScanLine className="h-5 w-5" />
-              Scan Recycler QR Code
-            </Button>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {performanceStats.map((stat, i) => (
-                <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
-                  <Card className="p-4">
-                    <stat.icon className={`h-5 w-5 mb-2 ${stat.color}`} />
-                    <div className="text-2xl font-display font-bold">{stat.value}</div>
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+          <AnimatePresence initial={false}>
+            {showDashboard && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25 }}
+                className="overflow-hidden"
+              >
+                <div className="mb-5">
+                  <PickerMapTracker role="recycler" title="Recycler activity heatmap" />
+                </div>
 
-            <Tabs value={tab} onValueChange={setTab}>
-              <TabsList className="w-full">
-                <TabsTrigger value="schedule" className="flex-1">
-                  <CalendarDays className="h-4 w-4 mr-1.5" /> Schedule ({pending.length})
-                </TabsTrigger>
-                <TabsTrigger value="history" className="flex-1">
-                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> History ({completed.length})
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="schedule" className="mt-4 space-y-3">
-                {pending.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No pending pickups</p>
-                ) : (
-                  pending.map((pickup, i) => (
-                    <motion.div key={pickup.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}>
-                      <PickupCard pickup={pickup} onTrack={() => setSelectedPickup(pickup)} />
-                    </motion.div>
-                  ))
-                )}
-              </TabsContent>
-
-              <TabsContent value="history" className="mt-4 space-y-3">
-                {weeklyPickups
-                  .filter((p) => p.status !== "pending")
-                  .map((pickup, i) => (
-                    <motion.div key={pickup.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}>
-                      <PickupCard pickup={pickup} />
+                {/* Scan QR Button */}
+                <Button
+                  className="w-full mb-4 gap-2 h-12 text-base"
+                  onClick={() => setShowScanner(true)}
+                >
+                  <ScanLine className="h-5 w-5" />
+                  Scan Recycler QR Code
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full mb-4 gap-2 h-12 text-base border-primary/30"
+                  onClick={() => navigate("/picker/ai-camera")}
+                >
+                  <ScanLine className="h-5 w-5" />
+                  AI Plastic Scanner
+                </Button>
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {performanceStats.map((stat, i) => (
+                    <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
+                      <Card className="p-4">
+                        <stat.icon className={`h-5 w-5 mb-2 ${stat.color}`} />
+                        <div className="text-2xl font-display font-bold">{stat.value}</div>
+                        <p className="text-xs text-muted-foreground">{stat.label}</p>
+                      </Card>
                     </motion.div>
                   ))}
-              </TabsContent>
-            </Tabs>
-          </>
+                </div>
+
+                <Tabs value={tab} onValueChange={setTab}>
+                  <TabsList className="w-full">
+                    <TabsTrigger value="schedule" className="flex-1">
+                      <CalendarDays className="h-4 w-4 mr-1.5" /> Schedule ({pending.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="history" className="flex-1">
+                      <CheckCircle2 className="h-4 w-4 mr-1.5" /> History ({completed.length})
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="schedule" className="mt-4 space-y-3">
+                    {pending.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No pending pickups</p>
+                    ) : (
+                      pending.map((pickup, i) => (
+                        <motion.div key={pickup.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}>
+                          <PickupCard pickup={pickup} onTrack={() => setSelectedPickup(pickup)} />
+                        </motion.div>
+                      ))
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="history" className="mt-4 space-y-3">
+                    {weeklyPickups
+                      .filter((p) => p.status !== "pending")
+                      .map((pickup, i) => (
+                        <motion.div key={pickup.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}>
+                          <PickupCard pickup={pickup} />
+                        </motion.div>
+                      ))}
+                  </TabsContent>
+                </Tabs>
+              </motion.div>
+            )}
+          </AnimatePresence>
         )}
 
         {bottomTab === "schedule" && (
