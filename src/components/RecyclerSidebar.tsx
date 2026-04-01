@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import {
-  Home, Zap, User, Wallet, Trophy, Leaf, Award, Share2, BookOpen, Users, CalendarPlus, ScanLine,
+  Home, Zap, User, Wallet, Trophy, Leaf, Award, Share2, BookOpen, Users, CalendarPlus,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useRef, useEffect, useState } from "react";
@@ -35,7 +35,6 @@ const recyclerToolsItems: NavigationItem[] = [
   { key: "wallet", icon: Wallet, label: "Wallet", path: "/recycler/wallet" },
   { key: "achievements", icon: Award, label: "Achievements", path: "/recycler/achievements" },
   { key: "referrals", icon: Share2, label: "Referrals", path: "/recycler/referral" },
-  { key: "aiCamera", icon: ScanLine, label: "AI Scanner", path: "/recycler/ai-camera" },
 ];
 
 const quickActionItems: QuickActionItem[] = [

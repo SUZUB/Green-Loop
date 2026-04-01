@@ -19,24 +19,30 @@ export type Database = {
           created_at: string
           id: string
           picker_id: string
+          plastic_type: string | null
           points_earned: number
-          recycler_id: string
+          recycler_id: string | null
+          scan_id: string | null
           weight_kg: number
         }
         Insert: {
           created_at?: string
           id?: string
           picker_id: string
+          plastic_type?: string | null
           points_earned?: number
-          recycler_id: string
+          recycler_id?: string | null
+          scan_id?: string | null
           weight_kg?: number
         }
         Update: {
           created_at?: string
           id?: string
           picker_id?: string
+          plastic_type?: string | null
           points_earned?: number
-          recycler_id?: string
+          recycler_id?: string | null
+          scan_id?: string | null
           weight_kg?: number
         }
         Relationships: []
@@ -210,6 +216,16 @@ export type Database = {
           p_picker_id: string
           p_recycler_id: string
           p_weight_kg: number
+        }
+        Returns: Json
+      }
+      process_scan_payment: {
+        Args: {
+          p_scan_id: string
+          p_plastic_type: string
+          p_weight_kg: number
+          p_coins_earned: number
+          p_scan_metadata?: Json
         }
         Returns: Json
       }

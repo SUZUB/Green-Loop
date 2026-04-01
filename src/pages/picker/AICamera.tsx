@@ -14,8 +14,16 @@ import {
   Layers,
   SunMedium,
   ArrowLeft,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Coins,
+  Receipt,
+  QrCode,
+  User,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Html5Qrcode } from "html5-qrcode";
 import { PageBackground } from "@/components/PageBackground";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,12 +33,25 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   analyzeImageElement,
   tryVisionEndpoint,
   type LangCode,
   type ScanAnalysis,
 } from "@/lib/plasticScan/analysis";
+import {
+  checkEligibility,
+  calculatePayment,
+  generateScanId,
+  submitPayment,
+  getRejectionMessage,
+  UnauthorizedError,
+  DuplicateScanError,
+  type PaymentPreview,
+  type PaymentReceipt,
+  type EligibilityResult,
+} from "@/lib/plasticScan/paymentEngine";
 
 const HISTORY_KEY = "green_loop_picker_scan_history";
 
@@ -40,6 +61,11 @@ type HistoryRow = {
   scannedAt: string;
   analysis: ScanAnalysis;
 };
+
+interface RecyclerInfo {
+  userId: string;
+  name: string;
+}
 
 function isHistoryRow(x: unknown): x is HistoryRow {
   if (!x || typeof x !== "object") return false;
@@ -210,6 +236,173 @@ function ScanResultBody({
   );
 }
 
+function PaymentRejectionBanner({
+  rejection,
+  onRetake,
+}: {
+  rejection: Extract<EligibilityResult, { eligible: false }>;
+  onRetake: () => void;
+}) {
+  const message = getRejectionMessage(
+    rejection.reason,
+    rejection.reason === "low_recyclability"
+      ? { plasticType: rejection.plasticType }
+      : rejection.reason === "contamination"
+      ? { contaminants: rejection.contaminants }
+      : undefined
+  );
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3"
+    >
+      <div className="flex items-start gap-2">
+        <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+        <div>
+          <p className="font-semibold text-red-800 text-sm">
+            {rejection.reason === "contamination" ? "Contamination Detected" : "Item Not Accepted"}
+          </p>
+          <p className="text-sm text-red-700 mt-1">{message}</p>
+        </div>
+      </div>
+      <Button type="button" variant="outline" size="sm" className="gap-1" onClick={onRetake}>
+        <RotateCcw className="h-4 w-4" /> Retake scan
+      </Button>
+    </motion.div>
+  );
+}
+
+function PaymentConfirmationPanel({
+  preview,
+  onConfirm,
+  onCancel,
+  isSubmitting,
+}: {
+  preview: PaymentPreview;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isSubmitting: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-4"
+    >
+      <div className="flex items-center gap-2">
+        <Coins className="h-5 w-5 text-emerald-600" />
+        <p className="font-semibold text-emerald-800">Confirm Payment</p>
+      </div>
+
+      <div className="space-y-2 text-sm">
+        {preview.items.map((it, i) => (
+          <div key={i} className="flex justify-between items-center rounded-lg bg-white border px-3 py-2">
+            <div>
+              <span className="font-medium">{it.plasticType}</span>
+              <span className="text-muted-foreground ml-2">
+                ~{(it.weightKg * 1000).toFixed(0)} g
+              </span>
+            </div>
+            <Badge className="bg-emerald-600">{it.coins} coins</Badge>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-lg bg-white border px-3 py-2 flex justify-between items-center text-sm">
+        <span className="text-muted-foreground">Recyclability</span>
+        <Badge variant="outline">{preview.recyclability}</Badge>
+      </div>
+
+      <div className="rounded-lg bg-emerald-100 border border-emerald-200 px-3 py-2 flex justify-between items-center">
+        <span className="font-semibold text-emerald-800">Total reward</span>
+        <span className="text-xl font-bold text-emerald-700">{preview.totalCoins} coins</span>
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          className="flex-1 gap-1"
+          onClick={onConfirm}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Processing…</>
+          ) : (
+            <><CheckCircle className="h-4 w-4" /> Confirm & Earn</>
+          )}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          Cancel
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
+function PaymentReceiptPanel({
+  receipt,
+  onScanAnother,
+  onViewHistory,
+}: {
+  receipt: PaymentReceipt;
+  onScanAnother: () => void;
+  onViewHistory: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 space-y-4"
+    >
+      <div className="flex items-center gap-2">
+        <Receipt className="h-5 w-5 text-emerald-600" />
+        <p className="font-semibold text-emerald-800">Payment Receipt</p>
+      </div>
+
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Transaction ID</span>
+          <span className="font-mono text-xs truncate max-w-[160px]">{receipt.transactionId}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Recycler account</span>
+          <span className="font-medium">{receipt.recyclerUserId.slice(0, 8)}…</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Plastic type(s)</span>
+          <span>{receipt.plasticTypes.join(", ")}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Weight</span>
+          <span>{receipt.weightKg.toFixed(3)} kg</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Credits earned</span>
+          <span className="font-bold text-emerald-700">+{receipt.coinsEarned}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Recycler new balance</span>
+          <span className="font-bold">{receipt.recyclerNewBalance} coins</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Time</span>
+          <span>{new Date(receipt.timestamp).toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <Button type="button" className="flex-1 gap-1" onClick={onScanAnother}>
+          <ScanLine className="h-4 w-4" /> Scan another item
+        </Button>
+        <Button type="button" variant="outline" className="gap-1" onClick={onViewHistory}>
+          <History className="h-4 w-4" /> History
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
 function playTone(freq: number, duration = 0.08) {
   try {
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -251,6 +444,20 @@ export default function PickerAICamera() {
   const [analysis, setAnalysis] = useState<ScanAnalysis | null>(null);
   /** When user opens a past scan from the list (no image blob in memory). */
   const [fromHistory, setFromHistory] = useState(false);
+
+  // QR scan state — recycler must be identified before item scanning
+  const [recyclerInfo, setRecyclerInfo] = useState<RecyclerInfo | null>(null);
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [qrScanError, setQrScanError] = useState("");
+  const qrScannerRef = useRef<Html5Qrcode | null>(null);
+
+  // Payment state
+  type PaymentState = "idle" | "confirming" | "submitting" | "receipt" | "error";
+  const [paymentState, setPaymentState] = useState<PaymentState>("idle");
+  const [paymentPreview, setPaymentPreview] = useState<PaymentPreview | null>(null);
+  const [paymentReceipt, setPaymentReceipt] = useState<PaymentReceipt | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [rejection, setRejection] = useState<Extract<EligibilityResult, { eligible: false }> | null>(null);
   const [shutterFlash, setShutterFlash] = useState(false);
   const [history, setHistory] = useState<HistoryRow[]>(() => {
     try {
@@ -297,6 +504,62 @@ export default function PickerAICamera() {
   useEffect(() => {
     return () => stopCamera();
   }, [stopCamera]);
+
+  // QR scanner lifecycle
+  useEffect(() => {
+    if (!qrScannerOpen) {
+      qrScannerRef.current?.stop().catch(() => {});
+      qrScannerRef.current = null;
+      return;
+    }
+    let mounted = true;
+    const startQr = async () => {
+      try {
+        const scanner = new Html5Qrcode("ai-camera-qr-reader");
+        qrScannerRef.current = scanner;
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 240, height: 240 } },
+          async (decoded) => {
+            if (!mounted) return;
+            try {
+              const payload = JSON.parse(decoded);
+              if (payload.type !== "recycler" || !payload.id) {
+                setQrScanError("Invalid QR. Ask the recycler to show their GREEN LOOP QR code.");
+                return;
+              }
+              await scanner.stop();
+              if (!mounted) return;
+              const { data: profile } = await supabase
+                .from("profiles")
+                .select("full_name")
+                .eq("id", payload.id)
+                .maybeSingle();
+              if (!profile) {
+                setQrScanError("Recycler account not found. Please try again.");
+                return;
+              }
+              setRecyclerInfo({ userId: payload.id, name: (profile as any).full_name || "Recycler" });
+              setQrScannerOpen(false);
+              setQrScanError("");
+            } catch {
+              setQrScanError("Could not read QR code. Try again.");
+            }
+          },
+          () => {}
+        );
+      } catch {
+        if (mounted) setQrScanError("Camera access denied. Allow camera permissions.");
+      }
+    };
+    const timer = setTimeout(startQr, 300);
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+      qrScannerRef.current?.stop().catch(() => {});
+      qrScannerRef.current = null;
+    };
+  }, [qrScannerOpen]);
 
   const flipCamera = async () => {
     const next = facing === "user" ? "environment" : "user";
@@ -363,6 +626,19 @@ export default function PickerAICamera() {
     setFromHistory(false);
     setStage("done");
     playTone(880, 0.12);
+
+    // Payment flow: eligibility check + coin calculation
+    const scanId = generateScanId();
+    const eligibility = checkEligibility(result);
+    if (!eligibility.eligible) {
+      setRejection(eligibility);
+      setPaymentState("idle");
+    } else {
+      const preview = calculatePayment(result, scanId, recyclerInfo?.userId ?? "");
+      setPaymentPreview(preview);
+      setRejection(null);
+      setPaymentState("confirming");
+    }
 
     const row: HistoryRow = {
       id: `scan-${Date.now()}`,
@@ -436,6 +712,17 @@ export default function PickerAICamera() {
     setFromHistory(false);
     setStage("idle");
     setFileName("capture.jpg");
+    setPaymentState("idle");
+    setPaymentPreview(null);
+    setPaymentReceipt(null);
+    setPaymentError(null);
+    setRejection(null);
+    // Keep recyclerInfo — one QR scan covers multiple item scans in a session
+  };
+
+  const resetSession = () => {
+    resetCapture();
+    setRecyclerInfo(null);
   };
 
   const speakSummary = () => {
@@ -468,6 +755,30 @@ export default function PickerAICamera() {
       }
     } catch {
       toast({ title: "Share cancelled", variant: "destructive" });
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!paymentPreview) return;
+    setPaymentState("submitting");
+    setPaymentError(null);
+    try {
+      const receipt = await submitPayment(paymentPreview);
+      setPaymentReceipt(receipt);
+      setPaymentState("receipt");
+      playTone(660, 0.15);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        navigate("/auth/login");
+        return;
+      }
+      if (err instanceof DuplicateScanError) {
+        toast({ title: "Already processed", description: "This scan was already submitted." });
+        setPaymentState("idle");
+        return;
+      }
+      setPaymentError(err instanceof Error ? err.message : "Payment failed. Please try again.");
+      setPaymentState("error");
     }
   };
 
@@ -517,6 +828,66 @@ export default function PickerAICamera() {
           </div>
         </div>
 
+        {/* ── QR Gate: must scan recycler QR before scanning items ── */}
+        <div className="mb-4">
+          {recyclerInfo ? (
+            <div className="flex items-center justify-between rounded-xl bg-emerald-900/80 border border-emerald-500/30 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-emerald-400" />
+                <div>
+                  <p className="text-xs text-emerald-300 font-medium">Recycler linked</p>
+                  <p className="text-sm font-semibold text-white">{recyclerInfo.name}</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="text-xs border-emerald-500/40 text-emerald-300 hover:bg-emerald-800"
+                onClick={resetSession}
+              >
+                Change
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-amber-900/80 border border-amber-500/30 px-4 py-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-amber-400" />
+                <p className="text-sm font-semibold text-amber-200">Scan Recycler QR first</p>
+              </div>
+              <p className="text-xs text-amber-300/80">
+                Ask the recycler to show their GREEN LOOP QR code. Credits will be added to their account after item verification.
+              </p>
+              {qrScannerOpen ? (
+                <div className="space-y-2">
+                  <div id="ai-camera-qr-reader" className="w-full rounded-lg overflow-hidden" />
+                  {qrScanError && (
+                    <p className="text-xs text-red-300">{qrScanError}</p>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs border-amber-500/40 text-amber-300"
+                    onClick={() => { setQrScannerOpen(false); setQrScanError(""); }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+                  onClick={() => { setQrScanError(""); setQrScannerOpen(true); }}
+                >
+                  <QrCode className="h-4 w-4" /> Scan Recycler QR
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
           <Card className="p-4 md:p-5 bg-white/92 backdrop-blur border-white/50 overflow-hidden">
             {!capturedUrl && !analysis && (
@@ -551,15 +922,21 @@ export default function PickerAICamera() {
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full text-white/80 p-6 text-center">
                       <SunMedium className="h-10 w-10 mb-3 opacity-70" />
-                      <p className="text-sm mb-4">Start the camera for a live preview, or upload a photo.</p>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        <Button type="button" onClick={() => void startCamera()} className="gap-2">
-                          <Camera className="h-4 w-4" /> {t.liveCamera}
-                        </Button>
-                        <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} className="gap-2">
-                          <Upload className="h-4 w-4" /> {t.upload}
-                        </Button>
-                      </div>
+                      {!recyclerInfo ? (
+                        <p className="text-sm text-amber-300">Scan the recycler's QR code above before scanning items.</p>
+                      ) : (
+                        <>
+                          <p className="text-sm mb-4">Start the camera for a live preview, or upload a photo.</p>
+                          <div className="flex flex-wrap gap-2 justify-center">
+                            <Button type="button" onClick={() => void startCamera()} className="gap-2">
+                              <Camera className="h-4 w-4" /> {t.liveCamera}
+                            </Button>
+                            <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} className="gap-2">
+                              <Upload className="h-4 w-4" /> {t.upload}
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -630,7 +1007,7 @@ export default function PickerAICamera() {
                     <Button
                       type="button"
                       onClick={() => blobRef && void runAnalysis(blobRef, fileName)}
-                      disabled={!blobRef}
+                      disabled={!blobRef || !recyclerInfo}
                       className="gap-2"
                     >
                       <ScanLine className="h-4 w-4" /> {t.analyze}
@@ -638,21 +1015,85 @@ export default function PickerAICamera() {
                     <Button type="button" variant="outline" className="gap-2" onClick={resetCapture}>
                       <RotateCcw className="h-4 w-4" /> {t.retake}
                     </Button>
+                    {!recyclerInfo && (
+                      <p className="text-xs text-amber-600 w-full">Scan recycler QR first to enable payment.</p>
+                    )}
                   </div>
                 )}
 
                 {analysis && (
-                  <ScanResultBody
-                    analysis={analysis}
-                    t={t}
-                    batchMode={batchMode}
-                    speakSummary={speakSummary}
-                    shareSummary={() => void shareSummary()}
-                    onRetake={() => {
-                      resetCapture();
-                      void startCamera();
-                    }}
-                  />
+                  <>
+                    {/* Rejection banner */}
+                    {rejection && (
+                      <PaymentRejectionBanner
+                        rejection={rejection}
+                        onRetake={() => { resetCapture(); void startCamera(); }}
+                      />
+                    )}
+
+                    {/* Payment confirmation */}
+                    {paymentState === "confirming" && paymentPreview && (
+                      <PaymentConfirmationPanel
+                        preview={paymentPreview}
+                        onConfirm={() => void handleConfirmPayment()}
+                        onCancel={() => { setPaymentState("idle"); setPaymentPreview(null); }}
+                        isSubmitting={false}
+                      />
+                    )}
+
+                    {/* Submitting */}
+                    {paymentState === "submitting" && paymentPreview && (
+                      <PaymentConfirmationPanel
+                        preview={paymentPreview}
+                        onConfirm={() => void handleConfirmPayment()}
+                        onCancel={() => {}}
+                        isSubmitting={true}
+                      />
+                    )}
+
+                    {/* Error with retry */}
+                    {paymentState === "error" && paymentError && (
+                      <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+                          <p className="text-sm text-red-700">{paymentError}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => void handleConfirmPayment()}
+                        >
+                          <RefreshCw className="h-4 w-4" /> Retry payment
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Receipt */}
+                    {paymentState === "receipt" && paymentReceipt && (
+                      <PaymentReceiptPanel
+                        receipt={paymentReceipt}
+                        onScanAnother={() => { resetCapture(); void startCamera(); }}
+                        onViewHistory={() => navigate("/picker/profile")}
+                      />
+                    )}
+
+                    {/* Scan result body (always shown below payment panels) */}
+                    {paymentState !== "receipt" && (
+                      <ScanResultBody
+                        analysis={analysis}
+                        t={t}
+                        batchMode={batchMode}
+                        speakSummary={speakSummary}
+                        shareSummary={() => void shareSummary()}
+                        onRetake={() => {
+                          resetCapture();
+                          void startCamera();
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )}
