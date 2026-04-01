@@ -12,6 +12,19 @@ interface EcoState {
   activeChallenges: Challenge[];
   transactionHistory: Transaction[];
   leaderboardData: LeaderboardUser[];
+  // Global data that updates across all components
+  globalPlasticCollected: number;
+  globalCO2Saved: number;
+  globalUsersActive: number;
+  globalPointsDistributed: number;
+  // User profile data
+  userProfile: {
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    role: 'recycler' | 'picker' | 'buyer' | null;
+  };
 }
 
 const initialState: EcoState = {
@@ -20,6 +33,19 @@ const initialState: EcoState = {
   activeChallenges: [],
   transactionHistory: [],
   leaderboardData: mockLeaderboardData,
+  // Global stats
+  globalPlasticCollected: 12450,
+  globalCO2Saved: 6225,
+  globalUsersActive: 50000,
+  globalPointsDistributed: 1000000,
+  // User profile
+  userProfile: {
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    role: null,
+  },
 };
 
 type EcoAction =
@@ -27,7 +53,10 @@ type EcoAction =
   | { type: "JOIN_CHALLENGE"; challenge: Challenge }
   | { type: "COMPLETE_CHALLENGE"; challengeId: string; impactKg: number }
   | { type: "LOAD_STATE"; state: Partial<EcoState> }
-  | { type: "SET_STATE"; state: Partial<EcoState> };
+  | { type: "SET_STATE"; state: Partial<EcoState> }
+  | { type: "UPDATE_GLOBAL_STATS"; stats: Partial<Pick<EcoState, 'globalPlasticCollected' | 'globalCO2Saved' | 'globalUsersActive' | 'globalPointsDistributed'>> }
+  | { type: "UPDATE_USER_PROFILE"; profile: Partial<EcoState['userProfile']> }
+  | { type: "ADD_PLASTIC_COLLECTION"; amount: number }
 
 function ecoReducer(state: EcoState, action: EcoAction): EcoState {
   switch (action.type) {
@@ -81,6 +110,31 @@ function ecoReducer(state: EcoState, action: EcoAction): EcoState {
       return { ...state, ...action.state };
     case "SET_STATE":
       return { ...state, ...action.state };
+    case "UPDATE_GLOBAL_STATS":
+      return {
+        ...state,
+        globalPlasticCollected: action.stats.globalPlasticCollected ?? state.globalPlasticCollected,
+        globalCO2Saved: action.stats.globalCO2Saved ?? state.globalCO2Saved,
+        globalUsersActive: action.stats.globalUsersActive ?? state.globalUsersActive,
+        globalPointsDistributed: action.stats.globalPointsDistributed ?? state.globalPointsDistributed,
+      };
+    case "UPDATE_USER_PROFILE":
+      return {
+        ...state,
+        userProfile: { ...state.userProfile, ...action.profile },
+      };
+    case "ADD_PLASTIC_COLLECTION":
+      const newPlasticCollected = state.globalPlasticCollected + action.amount;
+      const newCO2Saved = state.globalCO2Saved + (action.amount * 0.5); // 100g plastic = 50g CO2
+      const newPoints = Math.floor(action.amount * 0.01); // Earn points for plastic
+      return {
+        ...state,
+        globalPlasticCollected: newPlasticCollected,
+        globalCO2Saved: newCO2Saved,
+        globalPointsDistributed: state.globalPointsDistributed + newPoints,
+        userBalance: state.userBalance + newPoints,
+        userImpactKg: state.userImpactKg + (action.amount / 1000), // Convert g to kg
+      };
     default:
       return state;
   }

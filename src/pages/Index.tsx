@@ -42,159 +42,22 @@ const LiveCounter = ({ end, suffix, label, icon: Icon, color }: {
 };
 
 const achievements = [
-  { icon: Award, title: "Eco Warrior", desc: "100kg recycled", emoji: "🏅", color: "bg-primary" },
-  { icon: Star, title: "Green Champion", desc: "500kg recycled", emoji: "🏆", color: "bg-secondary" },
-  { icon: Zap, title: "Plastic Saver", desc: "First recycling", emoji: "⭐", color: "bg-leaf" },
+  { icon: Award, title: "Eco Warrior", desc: "100kg recycled", emoji: "🏅", color: "bg-leaf" },
+  { icon: Star, title: "Green Champion", desc: "500kg recycled", emoji: "🏆", color: "bg-primary" },
+  { icon: Zap, title: "Plastic Saver", desc: "First recycling", emoji: "⭐", color: "bg-secondary" },
   { icon: Flame, title: "Consistency King", desc: "10 consecutive pickups", emoji: "🔥", color: "bg-earth" },
 ];
 
-const impactCards = [
-  { icon: Users, value: 50000, suffix: "+", label: "Recyclers Active", badge: "Growing Community", color: "bg-primary" },
-  { icon: Recycle, value: 500, suffix: "+", label: "Tons Recycled", badge: "Massive Impact", color: "bg-secondary" },
-  { icon: Star, value: 1000000, suffix: "", label: "Points Distributed", badge: "Rewarding Community", color: "bg-leaf" },
-  { icon: TreePine, value: 10000, suffix: "+", label: "Trees Planted Equivalent", badge: "Planet Saver", color: "bg-earth" },
-];
-
-const safetyPoints = [
-  "100% Safe & Certified Recycling Process",
-  "All our recyclers are trained & verified",
-  "Your plastic is handled with care",
-  "Transparent tracking from pickup to recycling",
-];
-
-const ImpactCard = ({ card, i }: { card: typeof impactCards[0]; i: number }) => {
-  const { count, ref } = useCountUp(card.value, 2500);
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 50, scale: 0.9 }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.5, delay: i * 0.12, ease: "easeOut" }}
-      className="relative group p-6 rounded-2xl bg-card shadow-card border border-border hover:shadow-elevated transition-all duration-300"
-    >
-      <div className={`w-12 h-12 rounded-xl ${card.color} flex items-center justify-center mb-4`}>
-        <card.icon className="h-6 w-6 text-primary-foreground" />
-      </div>
-      <div className="text-3xl md:text-4xl font-display font-bold text-foreground mb-1">
-        {count.toLocaleString()}{card.suffix}
-      </div>
-      <p className="text-sm text-muted-foreground mb-3">{card.label}</p>
-      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-accent text-accent-foreground text-xs font-medium">
-        <Award className="h-3 w-3" /> {card.badge}
-      </span>
-    </motion.div>
-  );
-};
-
-const ParallaxBg = ({ src, speed = 0.3, overlay }: { src: string; speed?: number; overlay: string }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], [`-${speed * 100}px`, `${speed * 100}px`]);
-
-  return (
-    <div ref={ref} className="absolute inset-0 overflow-hidden">
-      <motion.img src={src} alt="" className="w-full h-[120%] object-cover absolute -top-[10%]" style={{ y }} />
-      <div className={`absolute inset-0 ${overlay}`} />
-    </div>
-  );
-};
-
-const WhyRecycleSection = () => {
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
-  const orbY1 = useTransform(scrollYProgress, [0, 1], [-60, 80]);
-  const orbY2 = useTransform(scrollYProgress, [0, 1], [40, -100]);
-
-  return (
-    <section id="why-recycle" ref={sectionRef} className="relative py-28 overflow-hidden">
-      <ParallaxBg src={heroPollutionBg} speed={0.5} overlay="bg-foreground/70" />
-      <motion.div className="absolute top-10 left-10 w-32 h-32 rounded-full bg-primary/10 blur-2xl pointer-events-none" style={{ y: orbY1 }} />
-      <motion.div className="absolute bottom-20 right-10 w-48 h-48 rounded-full bg-secondary/10 blur-3xl pointer-events-none" style={{ y: orbY2 }} />
-      <div className="container mx-auto px-4 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 60 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-14"
-        >
-          <motion.h2
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-3xl md:text-5xl font-display font-bold mb-4 text-primary-foreground"
-          >
-            Why Recycle?
-          </motion.h2>
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-primary-foreground/70 max-w-2xl mx-auto text-lg"
-          >
-            Join a growing movement. See the impact our community is making together.
-          </motion.p>
-        </motion.div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-16">
-          {impactCards.map((card, i) => (
-            <ImpactCard key={card.label} card={card} i={i + 1} />
-          ))}
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.7 }}
-        >
-          <div className="text-center mb-8">
-            <h3 className="text-2xl font-display font-bold mb-2 text-primary-foreground">Unlock Achievements</h3>
-            <p className="text-primary-foreground/60">Start recycling and earn badges for your contributions!</p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
-            {achievements.map((a, i) => (
-              <motion.div
-                key={a.title}
-                initial={{ opacity: 0, y: 40, scale: 0.85, rotateX: 20 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
-                viewport={{ once: true, margin: "-30px" }}
-                transition={{ duration: 0.6, delay: i * 0.15, ease: "easeOut" }}
-                whileHover={{ scale: 1.05, y: -5 }}
-                className="relative text-center p-5 rounded-2xl bg-card/90 backdrop-blur-md border border-border/50 shadow-elevated transition-all duration-300 group"
-              >
-                <motion.div
-                  className={`w-14 h-14 rounded-2xl ${a.color} flex items-center justify-center mx-auto mb-3`}
-                  whileHover={{ rotate: [0, -10, 10, 0], scale: 1.15 }}
-                  transition={{ duration: 0.4 }}
-                >
-                  <span className="text-2xl">{a.emoji}</span>
-                </motion.div>
-                <h4 className="font-display font-semibold text-foreground text-sm mb-1">{a.title}</h4>
-                <p className="text-xs text-muted-foreground">{a.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-            className="text-center text-sm text-primary-foreground/60 mt-6"
-          >
-            Start recycling and unlock achievements! 🌱
-          </motion.p>
-        </motion.div>
-      </div>
-    </section>
-  );
-};
-
 const Index = () => {
   const navigate = useNavigate();
+  const { state } = useEco();
+
+  const impactCards = [
+    { icon: Users, value: state.globalUsersActive, suffix: "+", label: "Recyclers Active", badge: "Growing Community", color: "bg-leaf" },
+    { icon: Recycle, value: Math.floor(state.globalPlasticCollected / 1000), suffix: "+", label: "Tons Recycled", badge: "Massive Impact", color: "bg-primary" },
+    { icon: Star, value: state.globalPointsDistributed, suffix: "", label: "Points Distributed", badge: "Rewarding Community", color: "bg-secondary" },
+    { icon: TreePine, value: Math.floor(state.globalPlasticCollected / 100), suffix: "+", label: "Trees Planted Equivalent", badge: "Planet Saver", color: "bg-earth" },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -216,12 +79,11 @@ const Index = () => {
         {/* Plastic pollution background image */}
         <ParallaxBg src={heroIntroPollutionBg} speed={0.4} overlay="bg-foreground/40" />
         <div className="absolute top-20 right-0 w-96 h-96 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full bg-secondary/10 blur-3xl" />
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center mb-12">
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/20 text-primary-foreground text-sm font-medium mb-6 border border-primary-foreground/20">
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-leaf/20 text-leaf-foreground text-sm font-medium mb-6 border border-leaf-foreground/20">
                 <Leaf className="h-4 w-4" /> Making recycling effortless
               </span>
             </motion.div>
@@ -233,7 +95,7 @@ const Index = () => {
               className="text-4xl md:text-6xl lg:text-7xl font-display font-bold leading-tight mb-6 text-primary-foreground"
             >
               Turn Your Plastic Into{" "}
-              <span className="text-primary">Points & Purpose</span>
+              <span className="text-leaf">Points & Purpose</span>
             </motion.h1>
 
             <motion.p
@@ -254,7 +116,7 @@ const Index = () => {
               <Button size="lg" className="gap-2 text-lg px-10 shadow-elevated" onClick={() => navigate("/role-select")}>
                 Get Started <ArrowRight className="h-5 w-5" />
               </Button>
-              <Button size="lg" className="gap-2 text-lg px-8 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
+              <Button size="lg" className="gap-2 text-lg px-8 bg-leaf text-leaf-foreground hover:bg-leaf/90" onClick={() => {
                 document.getElementById("why-recycle")?.scrollIntoView({ behavior: "smooth" });
               }}>
                 Learn More
@@ -269,9 +131,9 @@ const Index = () => {
             transition={{ duration: 0.8, delay: 0.5 }}
             className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl mx-auto"
           >
-            <LiveCounter end={12450} suffix=" kg" label="Plastic recycled today" icon={Recycle} color="bg-primary" />
-            <LiveCounter end={6225} suffix=" kg" label="CO₂ saved today" icon={Factory} color="bg-secondary" />
-            <LiveCounter end={1245} suffix="" label="Animals protected" icon={Fish} color="bg-ocean" />
+            <LiveCounter end={state.globalPlasticCollected} suffix=" kg" label="Plastic recycled today" icon={Recycle} color="bg-leaf" />
+            <LiveCounter end={state.globalCO2Saved} suffix=" kg" label="CO₂ saved today" icon={Factory} color="bg-primary" />
+            <LiveCounter end={Math.floor(state.globalPlasticCollected / 10)} suffix="" label="Animals protected" icon={Fish} color="bg-ocean" />
           </motion.div>
 
           {/* Key Messaging */}
@@ -285,7 +147,7 @@ const Index = () => {
               className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-6 shadow-card"
             >
               <div className="flex items-center gap-2 mb-4">
-                <Globe className="h-5 w-5 text-primary" />
+                <Globe className="h-5 w-5 text-leaf" />
                 <h3 className="font-display font-semibold text-foreground">Environmental Impact</h3>
               </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
@@ -304,7 +166,7 @@ const Index = () => {
               className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-6 shadow-card"
             >
               <div className="flex items-center gap-2 mb-4">
-                <Droplets className="h-5 w-5 text-secondary" />
+                <Droplets className="h-5 w-5 text-primary" />
                 <h3 className="font-display font-semibold text-foreground">Benefits of Recycling</h3>
               </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
@@ -323,7 +185,7 @@ const Index = () => {
               className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-6 shadow-card"
             >
               <div className="flex items-center gap-2 mb-4">
-                <Shield className="h-5 w-5 text-leaf" />
+                <Shield className="h-5 w-5 text-secondary" />
                 <h3 className="font-display font-semibold text-foreground">Safety Assurances</h3>
               </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
