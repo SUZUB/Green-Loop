@@ -31,22 +31,36 @@ function HeatmapLayer({ points }: { points: [number, number, number][] }) {
   useEffect(() => {
     if (!map || points.length === 0) return;
 
-    const heatLayer = (L as any).heatLayer(points, {
-      radius: 24,
-      blur: 32,
-      maxZoom: 16,
-      gradient: {
-        0.1: "#3b82f6",
-        0.4: "#60a5fa",
-        0.6: "#fbbf24",
-        0.8: "#f97316",
-        1.0: "#ef4444",
-      },
+    let heatLayer: any = null;
+
+    const addLayer = () => {
+      // Guard: don't render if the map container has no height yet
+      const size = map.getSize();
+      if (size.x === 0 || size.y === 0) return;
+
+      heatLayer = (L as any).heatLayer(points, {
+        radius: 24,
+        blur: 32,
+        maxZoom: 16,
+        gradient: {
+          0.1: "#3b82f6",
+          0.4: "#60a5fa",
+          0.6: "#fbbf24",
+          0.8: "#f97316",
+          1.0: "#ef4444",
+        },
+      });
+      heatLayer.addTo(map);
+    };
+
+    // Wait for the map to finish sizing itself before adding the heat layer
+    map.whenReady(() => {
+      // Extra tick so the CSS layout has fully applied
+      setTimeout(addLayer, 0);
     });
 
-    heatLayer.addTo(map);
     return () => {
-      if (map.hasLayer(heatLayer)) {
+      if (heatLayer && map.hasLayer(heatLayer)) {
         map.removeLayer(heatLayer);
       }
     };
@@ -265,7 +279,7 @@ export default function ChallengesPage() {
                 center={[12.94, 77.62]}
                 zoom={12}
                 scrollWheelZoom={false}
-                whenCreated={setMap}
+                ref={setMap}
                 className="h-full w-full"
               >
                 <TileLayer

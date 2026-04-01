@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import {
-  Home, Zap, User, Wallet, Trophy, Leaf, Award, Share2, BookOpen, Users, CalendarPlus,
+  Home, Zap, User, Wallet, Trophy, Leaf, Award, Share2, BookOpen, Users, CalendarPlus, ScanLine,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useRef, useEffect, useState } from "react";
