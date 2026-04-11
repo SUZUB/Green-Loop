@@ -1,0 +1,1606 @@
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { mockLeaderboardData, LeaderboardUser } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { subscribeToCompletions } from "@/hooks/usePickupSchedule";
+
+export type HeatmapReport = {
+  id: string;
+  lat: number;
+  lng: number;
+  intensity: number;
+  label: string;
+  description: string;
+  createdAt: string;
+};
+
+export type ChallengeLevel = "level-1" | "level-2" | "level-3";
+
+export interface ChallengeCard {
+  id: string;
+  title: string;
+  level: ChallengeLevel;
+  badgeLabel: string;
+  badgeClass: string;
+  description: string;
+  points: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  meetupTime: string;
+  meetupInstructions: string;
+  weather: {
+    condition: string;
+    temperature: string;
+    icon: string;
+  };
+  locationName: string;
+  lat: number;
+  lng: number;
+  areaCoordinates: [number, number][];
+  requiredTools?: string[];
+  participants: number;
+  participantAvatars: { id: string; name: string; initials: string; color: string }[];
+  targetImpactKg: number;
+  reportsFiledKg: number;
+  physicalIntensity: "Low" | "Medium" | "High";
+  ageSuitability: "Family Friendly" | "Adults Only";
+  status: string;
+  joined: boolean;
+  completed: boolean;
+  mapLink: string;
+  highlight: string;
+}
+
+export type MarketTransactionType = "Market Purchase" | "Challenge Reward" | "Market Stream";
+export type MarketTransactionStatus = "Complete" | "Pending";
+
+export interface MarketTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  status: MarketTransactionStatus;
+  createdAt: string;
+  type: MarketTransactionType;
+}
+
+const INITIAL_MARKET_TRANSACTIONS: MarketTransaction[] = [
+  {
+    id: "#RH-8807",
+    description: "Challenge Reward",
+    amount: 40,
+    status: "Complete",
+    type: "Challenge Reward",
+    createdAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+  },
+  {
+    id: "#RH-8819",
+    description: "Market Purchase",
+    amount: 120,
+    status: "Complete",
+    type: "Market Purchase",
+    createdAt: new Date(Date.now() - 1000 * 60 * 52).toISOString(),
+  },
+  {
+    id: "#RH-8821",
+    description: "Market Stream",
+    amount: 16,
+    status: "Complete",
+    type: "Market Stream",
+    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+  },
+];
+
+const MARKET_STORAGE_KEYS = {
+  userBalance: "recyclehub_user_balance",
+  availableMarketCredits: "recyclehub_available_market_credits",
+  transactions: "recyclehub_market_transactions",
+  globalMetrics: "recyclehub_global_metrics",
+  challenges: "recyclehub_challenges",
+  joinedChallengeIds: "recyclehub_joined_challenge_ids",
+  sourcingRequests: "recyclehub_sourcing_requests",
+  trackOrders: "recyclehub_track_orders",
+  recentActivity: "recyclehub_recent_activity",
+  topRecyclers: "recyclehub_top_recyclers",
+  quickActionStats: "recyclehub_quick_action_stats",
+  pickupQueue: "recyclehub_pickup_queue",
+  completedPickups: "recyclehub_completed_pickups",
+};
+
+const generateTransactionId = () => `#RH-${Math.floor(1000 + Math.random() * 9000)}`;
+
+const createMarketTransaction = (transaction: Omit<MarketTransaction, "id" | "createdAt">): MarketTransaction => ({
+  ...transaction,
+  id: generateTransactionId(),
+  createdAt: new Date().toISOString(),
+});
+
+const createMockMarketTransaction = (): MarketTransaction => {
+  const descriptions: Array<{ description: string; type: MarketTransactionType; amount: number }> = [
+    { description: "Market Purchase", type: "Market Purchase", amount: Math.floor(Math.random() * 20) + 5 },
+    { description: "Challenge Reward", type: "Challenge Reward", amount: Math.floor(Math.random() * 30) + 10 },
+  ];
+  const next = descriptions[Math.floor(Math.random() * descriptions.length)];
+  return createMarketTransaction({
+    description: next.description,
+    amount: next.amount,
+    status: "Complete",
+    type: next.type,
+  });
+};
+
+export interface SupplierApplication {
+  id: string;
+  supplier: string;
+  status: "Pending" | "Approved";
+  materialType: string;
+  quantity: string;
+  appliedAt: string;
+  location: string;
+  contact: string;
+}
+
+export interface SourcingRequest {
+  id: string;
+  materialType: string;
+  quantity: string;
+  requestedBy: string;
+  location: string;
+  requiredBy: string;
+  status: "Active" | "Pending";
+  applications: number;
+}
+
+export interface OrderTracker {
+  id: string;
+  supplier: string;
+  materialType: string;
+  quantity: string;
+  pricePerKg: string;
+  totalAmount: string;
+  status: "In Transit" | "Completed";
+  orderDate: string;
+  eta: string;
+  invoiceReady: boolean;
+}
+
+export interface PickupBooking {
+  id: string;
+  userName: string;
+  date: string;
+  timeSlot: string;
+  weightKg: number;
+  address: string;
+  status: "Pending" | "Completed";
+  pointsAwarded: number;
+  createdAt: string;
+}
+
+export interface GlobalMetrics {
+  totalPlasticRecycledKg: number;
+  totalCarbonCredits: number;
+  livePickersOnline: number;
+  communityMembers: number;
+  societiesCleaned: number;
+  totalAreasSanitized: number;
+}
+
+export interface RecentActivityItem {
+  id: string;
+  desc: string;
+  pts: string;
+  date: string;
+}
+
+export interface QuickActionStats {
+  bookPickup: { nextScheduled: string; recentPickups: number };
+  leaderboard: { rank: number; totalRecyclers: number };
+  myImpact: { totalWasteDivertedKg: number };
+  wallet: { balance: number; lastEarned: number; currency: string };
+  rewards: { availableRewards: number; pointsToMilestone: number; nextMilestone: number; rewardItems: string[] };
+  achievements: { badgesEarned: number; totalBadges: number };
+  referrals: { successfulReferrals: number; pendingRewardCredits: number; referralDetails: { id: string; name: string; status: string; rewardCredits: number; referredAt: string }[] };
+  learn: { completedCourses: number; inProgress: number; inProgressCourses: { id: string; title: string; status: string; progressPercentage: number }[] };
+  community: { activeGroups: number; pendingMessages: number; groupList: { id: string; name: string; unreadMessages: number }[] };
+}
+
+export interface TopRecycler {
+  id: string;
+  name: string;
+  avatar: string;
+  totalCredits: number;
+  rank: number;
+  badge?: string;
+}
+
+const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+const createInitialHeatmapReports = (count = 60): HeatmapReport[] =>
+  Array.from({ length: count }, (_, index) => {
+    const baseLat = 12.94 + (Math.random() - 0.5) * 0.12;
+    const baseLng = 77.62 + (Math.random() - 0.5) * 0.12;
+    const intensity = Number((0.45 + Math.random() * 0.5).toFixed(2));
+    const kg = Math.floor(Math.random() * 8) + 2;
+    return {
+      id: `report-init-${index}`,
+      lat: Number(baseLat.toFixed(5)),
+      lng: Number(baseLng.toFixed(5)),
+      intensity,
+      label: `Live pickup hotspot ${index + 1}`,
+      description: `${kg} kg of plastic waste reported in the active clean zone.`,
+      createdAt: new Date(Date.now() - (count - index) * 1000 * 60 * 2).toISOString(),
+    };
+  });
+
+const INITIAL_HEATMAP_REPORTS: HeatmapReport[] = createInitialHeatmapReports(60);
+
+const INITIAL_SUPPLIER_APPLICATIONS: SupplierApplication[] = [
+  { id: "app-01", supplier: "ABC Recyclers", status: "Pending", materialType: "PET", quantity: "500 kg", appliedAt: "2 hrs ago", location: "Mumbai", contact: "+91 98765 43210" },
+  { id: "app-02", supplier: "Green Plastics Co", status: "Pending", materialType: "HDPE", quantity: "750 kg", appliedAt: "5 hrs ago", location: "Bangalore", contact: "+91 91234 56789" },
+  { id: "app-03", supplier: "Recycle India", status: "Pending", materialType: "LDPE", quantity: "650 kg", appliedAt: "Yesterday", location: "Chennai", contact: "+91 99876 54321" },
+  { id: "app-04", supplier: "Eco Partners", status: "Pending", materialType: "PET", quantity: "1,200 kg", appliedAt: "1 day ago", location: "Pune", contact: "+91 90123 45678" },
+  { id: "app-05", supplier: "Urban Reclaim", status: "Pending", materialType: "HDPE", quantity: "900 kg", appliedAt: "2 days ago", location: "Hyderabad", contact: "+91 90012 34567" },
+  { id: "app-06", supplier: "Circle Green", status: "Approved", materialType: "PET", quantity: "1,100 kg", appliedAt: "3 days ago", location: "Delhi", contact: "+91 92345 67890" },
+  { id: "app-07", supplier: "BlueLoop Recycling", status: "Approved", materialType: "LDPE", quantity: "780 kg", appliedAt: "4 days ago", location: "Kochi", contact: "+91 93456 78901" },
+  { id: "app-08", supplier: "FreshCycle", status: "Approved", materialType: "HDPE", quantity: "1,750 kg", appliedAt: "5 days ago", location: "Ahmedabad", contact: "+91 94567 89012" },
+  { id: "app-09", supplier: "TerraLoop", status: "Approved", materialType: "PET", quantity: "930 kg", appliedAt: "6 days ago", location: "Kolkata", contact: "+91 95678 90123" },
+  { id: "app-10", supplier: "GreenShift", status: "Approved", materialType: "LDPE", quantity: "620 kg", appliedAt: "6 days ago", location: "Noida", contact: "+91 96789 01234" },
+  { id: "app-11", supplier: "ReNew Plastics", status: "Approved", materialType: "PET", quantity: "1,350 kg", appliedAt: "1 week ago", location: "Jaipur", contact: "+91 97890 12345" },
+  { id: "app-12", supplier: "EcoMerge", status: "Approved", materialType: "HDPE", quantity: "1,050 kg", appliedAt: "1 week ago", location: "Lucknow", contact: "+91 98901 23456" },
+  { id: "app-13", supplier: "SustainLoop", status: "Approved", materialType: "PET", quantity: "1,600 kg", appliedAt: "1 week ago", location: "Nagpur", contact: "+91 99012 34567" },
+  { id: "app-14", supplier: "BioHarvest", status: "Approved", materialType: "LDPE", quantity: "700 kg", appliedAt: "1 week ago", location: "Coimbatore", contact: "+91 90123 45678" },
+  { id: "app-15", supplier: "PlastiCycle", status: "Approved", materialType: "PET", quantity: "950 kg", appliedAt: "8 days ago", location: "Surat", contact: "+91 91234 56789" },
+  { id: "app-16", supplier: "GreenWave", status: "Approved", materialType: "HDPE", quantity: "1,300 kg", appliedAt: "9 days ago", location: "Nagpur", contact: "+91 92345 67890" },
+  { id: "app-17", supplier: "RecycleWorks", status: "Approved", materialType: "PET", quantity: "1,200 kg", appliedAt: "10 days ago", location: "Bhubaneswar", contact: "+91 93456 78901" },
+];
+
+const INITIAL_SOURCING_REQUESTS: SourcingRequest[] = [
+  { id: "req-01", materialType: "PET", quantity: "500 kg", requestedBy: "Green Plastics", location: "Bangalore", requiredBy: "Apr 5", status: "Active", applications: 12 },
+  { id: "req-02", materialType: "HDPE", quantity: "1,200 kg", requestedBy: "Eco Partners", location: "Mumbai", requiredBy: "Apr 8", status: "Active", applications: 9 },
+  { id: "req-03", materialType: "LDPE", quantity: "750 kg", requestedBy: "Urban Reclaim", location: "Chennai", requiredBy: "Apr 10", status: "Active", applications: 7 },
+  { id: "req-04", materialType: "PET", quantity: "2,000 kg", requestedBy: "BlueLoop Recycling", location: "Delhi", requiredBy: "Apr 12", status: "Active", applications: 15 },
+  { id: "req-05", materialType: "HDPE", quantity: "900 kg", requestedBy: "Circle Green", location: "Hyderabad", requiredBy: "Apr 14", status: "Active", applications: 11 },
+  { id: "req-06", materialType: "LDPE", quantity: "650 kg", requestedBy: "FreshCycle", location: "Pune", requiredBy: "Apr 15", status: "Active", applications: 8 },
+  { id: "req-07", materialType: "PET", quantity: "1,100 kg", requestedBy: "TerraLoop", location: "Kolkata", requiredBy: "Apr 18", status: "Active", applications: 13 },
+  { id: "req-08", materialType: "HDPE", quantity: "1,750 kg", requestedBy: "GreenShift", location: "Noida", requiredBy: "Apr 20", status: "Active", applications: 10 },
+];
+
+const INITIAL_TRACK_ORDERS: OrderTracker[] = [
+  { id: "ORD-101", supplier: "ABC Recyclers", materialType: "PET", quantity: "500 kg", pricePerKg: "₹14/kg", totalAmount: "₹7,000", status: "In Transit", orderDate: "Mar 22", eta: "Mar 28", invoiceReady: true },
+  { id: "ORD-102", supplier: "XYZ Plastics", materialType: "HDPE", quantity: "1,000 kg", pricePerKg: "₹15/kg", totalAmount: "₹15,000", status: "In Transit", orderDate: "Mar 20", eta: "Mar 27", invoiceReady: true },
+  { id: "ORD-103", supplier: "Green Plastics Co", materialType: "LDPE", quantity: "800 kg", pricePerKg: "₹13/kg", totalAmount: "₹10,400", status: "In Transit", orderDate: "Mar 21", eta: "Mar 29", invoiceReady: true },
+  { id: "ORD-104", supplier: "Eco Solutions", materialType: "PET", quantity: "1,200 kg", pricePerKg: "₹16/kg", totalAmount: "₹19,200", status: "In Transit", orderDate: "Mar 23", eta: "Mar 30", invoiceReady: true },
+  { id: "ORD-105", supplier: "Recycle India", materialType: "HDPE", quantity: "600 kg", pricePerKg: "₹14/kg", totalAmount: "₹8,400", status: "Completed", orderDate: "Mar 10", eta: "Mar 15", invoiceReady: true },
+  { id: "ORD-106", supplier: "BlueLoop Recycling", materialType: "PET", quantity: "750 kg", pricePerKg: "₹15/kg", totalAmount: "₹11,250", status: "Completed", orderDate: "Mar 8", eta: "Mar 14", invoiceReady: true },
+  { id: "ORD-107", supplier: "GreenShift", materialType: "LDPE", quantity: "900 kg", pricePerKg: "₹13/kg", totalAmount: "₹11,700", status: "Completed", orderDate: "Mar 6", eta: "Mar 13", invoiceReady: true },
+  { id: "ORD-108", supplier: "Urban Reclaim", materialType: "PET", quantity: "1,100 kg", pricePerKg: "₹14/kg", totalAmount: "₹15,400", status: "Completed", orderDate: "Mar 4", eta: "Mar 11", invoiceReady: true },
+  { id: "ORD-109", supplier: "SustainLoop", materialType: "HDPE", quantity: "650 kg", pricePerKg: "₹14/kg", totalAmount: "₹9,100", status: "Completed", orderDate: "Mar 2", eta: "Mar 9", invoiceReady: true },
+  { id: "ORD-110", supplier: "TerraLoop", materialType: "PET", quantity: "1,300 kg", pricePerKg: "₹15/kg", totalAmount: "₹19,500", status: "Completed", orderDate: "Mar 1", eta: "Mar 8", invoiceReady: true },
+  { id: "ORD-111", supplier: "EcoMerge", materialType: "LDPE", quantity: "700 kg", pricePerKg: "₹13/kg", totalAmount: "₹9,100", status: "Completed", orderDate: "Feb 28", eta: "Mar 6", invoiceReady: true },
+  { id: "ORD-112", supplier: "GreenWave", materialType: "PET", quantity: "950 kg", pricePerKg: "₹14/kg", totalAmount: "₹13,300", status: "Completed", orderDate: "Feb 26", eta: "Mar 4", invoiceReady: true },
+];
+
+const INITIAL_RECENT_ACTIVITY: RecentActivityItem[] = [
+  { id: "act-01", desc: "Nisha completed Cubbon Park Sunday Scrub", pts: "+22", date: "Today" },
+  { id: "act-02", desc: "Arjun finished BTM Layout Phase 2 Blitz", pts: "+18", date: "Today" },
+  { id: "act-03", desc: "Mira wrapped up Forest Edge Deep Dive", pts: "+35", date: "Yesterday" },
+  { id: "act-04", desc: "Ravi closed Canal-side Cleanup shift", pts: "+27", date: "Yesterday" },
+  { id: "act-05", desc: "Priya joined Industrial Park Community Patrol", pts: "+40", date: "2 days ago" },
+  { id: "act-06", desc: "Kiran completed Coastal Stretch Patrol", pts: "+45", date: "2 days ago" },
+  { id: "act-07", desc: "Leela finished MG Road Lunch Break Sweep", pts: "+20", date: "3 days ago" },
+  { id: "act-08", desc: "Sam completed Koramangala Cleanup Corridor", pts: "+32", date: "3 days ago" },
+  { id: "act-09", desc: "Anika closed Cubbon Park Sunday Scrub", pts: "+24", date: "4 days ago" },
+  { id: "act-10", desc: "Dev completed BTM Layout Phase 2 Blitz", pts: "+29", date: "4 days ago" },
+];
+
+const INITIAL_TOP_RECYCLERS: TopRecycler[] = [
+  { id: "top-01", rank: 1, name: "Arjun Mehta", avatar: "AM", totalCredits: 5000, badge: "🥇" },
+  { id: "top-02", rank: 2, name: "Priya Singh", avatar: "PS", totalCredits: 4200, badge: "🥈" },
+  { id: "top-03", rank: 3, name: "Kiran Rao", avatar: "KR", totalCredits: 3550, badge: "🥉" },
+  { id: "top-04", rank: 4, name: "Neha Gupta", avatar: "NG", totalCredits: 2200 },
+  { id: "top-05", rank: 5, name: "Rohit Sharma", avatar: "RS", totalCredits: 1450 },
+];
+
+const INITIAL_QUICK_ACTION_STATS: QuickActionStats = {
+  bookPickup: {
+    nextScheduled: "Tomorrow, 10:00 AM",
+    recentPickups: 24,
+  },
+  leaderboard: {
+    rank: 12,
+    totalRecyclers: 1200,
+  },
+  myImpact: {
+    totalWasteDivertedKg: 18750,
+  },
+  wallet: {
+    balance: 840,
+    lastEarned: 150,
+    currency: "₹",
+  },
+  rewards: {
+    availableRewards: 3,
+    pointsToMilestone: 1200,
+    nextMilestone: 1500,
+    rewardItems: ["Reusable Bottle", "Community Pass", "Carbon Voucher"],
+  },
+  achievements: {
+    badgesEarned: 8,
+    totalBadges: 12,
+  },
+  referrals: {
+    successfulReferrals: 5,
+    pendingRewardCredits: 100,
+    referralDetails: [
+      { id: "ref-01", name: "Riya Patel", status: "Completed", rewardCredits: 20, referredAt: "2 weeks ago" },
+      { id: "ref-02", name: "Manish Kumar", status: "Completed", rewardCredits: 20, referredAt: "1 week ago" },
+      { id: "ref-03", name: "Ananya Bose", status: "Completed", rewardCredits: 20, referredAt: "5 days ago" },
+      { id: "ref-04", name: "Sahil Mehta", status: "Pending", rewardCredits: 20, referredAt: "3 days ago" },
+      { id: "ref-05", name: "Tara Nair", status: "Accepted", rewardCredits: 20, referredAt: "Today" },
+    ],
+  },
+  learn: {
+    completedCourses: 4,
+    inProgress: 2,
+    inProgressCourses: [
+      { id: "course-01", title: "Plastic Identification 101", status: "In progress", progressPercentage: 45 },
+      { id: "course-02", title: "Zero-Waste Event Planning", status: "In progress", progressPercentage: 25 },
+    ],
+  },
+  community: {
+    activeGroups: 12,
+    pendingMessages: 3,
+    groupList: [
+      { id: "group-01", name: "MG Road Cleanup Crew", unreadMessages: 1 },
+      { id: "group-02", name: "River Patrol Collective", unreadMessages: 0 },
+      { id: "group-03", name: "Plastic-Free City Hub", unreadMessages: 2 },
+    ],
+  },
+};
+
+const INITIAL_GLOBAL_METRICS: GlobalMetrics = {
+  totalPlasticRecycledKg: 18750,
+  totalCarbonCredits: 8420,
+  livePickersOnline: randomInt(35, 52),
+  communityMembers: 1290,
+  societiesCleaned: 142,
+  totalAreasSanitized: 142,
+};
+
+const INITIAL_LEADERBOARD_USERS: LeaderboardUser[] = mockLeaderboardData;
+
+const INITIAL_CHALLENGES: ChallengeCard[] = [
+  {
+    id: "challenge-1",
+    title: "BTM Layout Phase 2 Blitz",
+    level: "level-1",
+    badgeLabel: "Quick Sweep",
+    badgeClass: "bg-emerald-100 text-emerald-800",
+    description: "A fast cleanup along the BTM layout stretch ahead of the weekend markets.",
+    points: 70,
+    locationName: "BTM Layout Phase 2",
+    date: "2026-03-30",
+    startTime: "09:00 AM",
+    endTime: "12:00 PM",
+    meetupTime: "Today • 09:00 AM",
+    meetupInstructions: "Meet next to the street food block near the main entrance.",
+    weather: { condition: "Sunny", temperature: "28°C", icon: "☀️" },
+    lat: 12.9348,
+    lng: 77.6183,
+    areaCoordinates: [
+      [12.9358, 77.6168],
+      [12.9342, 77.6195],
+      [12.9334, 77.6188],
+      [12.9341, 77.6173],
+    ],
+    requiredTools: ["Gloves", "Trash bags"],
+    participants: 22,
+    participantAvatars: [
+      { id: "a1", name: "Nisha", initials: "N", color: "bg-cyan-500" },
+      { id: "a2", name: "Arjun", initials: "A", color: "bg-emerald-500" },
+      { id: "a3", name: "Leela", initials: "L", color: "bg-amber-500" },
+    ],
+    targetImpactKg: 90,
+    reportsFiledKg: 35,
+    physicalIntensity: "Low",
+    ageSuitability: "Family Friendly",
+    status: "Open",
+    joined: false,
+    completed: false,
+    mapLink: "#",
+    highlight: "Community-friendly quick run",
+  },
+  {
+    id: "challenge-2",
+    title: "Cubbon Park Sunday Scrub",
+    level: "level-1",
+    badgeLabel: "Quick Sweep",
+    badgeClass: "bg-emerald-100 text-emerald-800",
+    description: "Sweep the park lawns and pathways before the Sunday morning crowds arrive.",
+    points: 85,
+    locationName: "Cubbon Park Central",
+    date: "2026-03-31",
+    startTime: "07:30 AM",
+    endTime: "10:00 AM",
+    meetupTime: "Tomorrow • 07:30 AM",
+    meetupInstructions: "Meet near the main bandstand next to the ticket counter.",
+    weather: { condition: "Clear", temperature: "26°C", icon: "🌤️" },
+    lat: 12.9763,
+    lng: 77.5921,
+    areaCoordinates: [
+      [12.9772, 77.5915],
+      [12.9760, 77.5934],
+      [12.9750, 77.5926],
+      [12.9757, 77.5910],
+    ],
+    requiredTools: ["Gloves", "Trash bags"],
+    participants: 35,
+    participantAvatars: [
+      { id: "a4", name: "Ravi", initials: "R", color: "bg-sky-500" },
+      { id: "a5", name: "Mira", initials: "M", color: "bg-violet-500" },
+      { id: "a6", name: "Sam", initials: "S", color: "bg-fuchsia-500" },
+    ],
+    targetImpactKg: 140,
+    reportsFiledKg: 60,
+    physicalIntensity: "Low",
+    ageSuitability: "Family Friendly",
+    status: "Open",
+    joined: false,
+    completed: false,
+    mapLink: "#",
+    highlight: "Perfect for morning volunteers",
+  },
+  {
+    id: "challenge-3",
+    title: "MG Road Lunch Break Sweep",
+    level: "level-1",
+    badgeLabel: "Quick Sweep",
+    badgeClass: "bg-emerald-100 text-emerald-800",
+    description: "Fast downtown curbside clearing while the lunch crowd is away.",
+    points: 95,
+    locationName: "MG Road Business District",
+    date: "2026-04-01",
+    startTime: "12:00 PM",
+    endTime: "02:30 PM",
+    meetupTime: "Monday • 12:00 PM",
+    meetupInstructions: "Meet under the clock tower at the east end.",
+    weather: { condition: "Partly cloudy", temperature: "29°C", icon: "⛅" },
+    lat: 12.9747,
+    lng: 77.6050,
+    areaCoordinates: [
+      [12.9758, 77.6043],
+      [12.9740, 77.6059],
+      [12.9735, 77.6048],
+      [12.9744, 77.6037],
+    ],
+    requiredTools: ["Gloves", "Trash bags"],
+    participants: 18,
+    participantAvatars: [
+      { id: "a7", name: "Priya", initials: "P", color: "bg-rose-500" },
+      { id: "a8", name: "Vikram", initials: "V", color: "bg-lime-500" },
+      { id: "a9", name: "Anika", initials: "A", color: "bg-slate-500" },
+    ],
+    targetImpactKg: 110,
+    reportsFiledKg: 42,
+    physicalIntensity: "Low",
+    ageSuitability: "Family Friendly",
+    status: "Open",
+    joined: false,
+    completed: false,
+    mapLink: "#",
+    highlight: "Quick after-work shift",
+  },
+  {
+    id: "challenge-4",
+    title: "Forest Edge Deep Dive",
+    level: "level-2",
+    badgeLabel: "Deep Dive",
+    badgeClass: "bg-amber-100 text-amber-800",
+    description: "Tackle a dense litter section near the Hesaraghatta forest edge.",
+    points: 180,
+    locationName: "Hesaraghatta Forest Outskirts",
+    date: "2026-04-02",
+    startTime: "08:30 AM",
+    endTime: "02:00 PM",
+    meetupTime: "Wednesday • 08:30 AM",
+    meetupInstructions: "Assemble at the western trailhead parking lot beside the ranger kiosk.",
+    weather: { condition: "Light showers", temperature: "26°C", icon: "🌦️" },
+    lat: 13.0946,
+    lng: 77.3971,
+    areaCoordinates: [
+      [13.0960, 77.3960],
+      [13.0948, 77.3990],
+      [13.0934, 77.3982],
+      [13.0940, 77.3953],
+    ],
+    requiredTools: ["Gloves", "Strong bags", "Water"],
+    participants: 28,
+    participantAvatars: [
+      { id: "a10", name: "Neha", initials: "N", color: "bg-cyan-600" },
+      { id: "a11", name: "Rohan", initials: "R", color: "bg-amber-500" },
+      { id: "a12", name: "Tara", initials: "T", color: "bg-fuchsia-500" },
+    ],
+    targetImpactKg: 200,
+    reportsFiledKg: 82,
+    physicalIntensity: "High",
+    ageSuitability: "Adults Only",
+    status: "Filling Fast",
+    joined: false,
+    completed: false,
+    mapLink: "#",
+    highlight: "Forest edge cleanup",
+  },
+  {
+    id: "challenge-5",
+    title: "Canal-side Cleanup",
+    level: "level-2",
+    badgeLabel: "Deep Dive",
+    badgeClass: "bg-amber-100 text-amber-800",
+    description: "Collect and remove debris from canal banks and nearby walkways.",
+    points: 210,
+    locationName: "Hennur Canal",
+    date: "2026-04-03",
+    startTime: "02:00 PM",
+    endTime: "06:00 PM",
+    meetupTime: "Thursday • 02:00 PM",
+    meetupInstructions: "Gather near the green bridge entrance close to the community bench.",
+    weather: { condition: "Humid", temperature: "31°C", icon: "☁️" },
+    lat: 13.0358,
+    lng: 77.6555,
+    areaCoordinates: [
+      [13.0369, 77.6541],
+      [13.0355, 77.6571],
+      [13.0343, 77.6563],
+      [13.0348, 77.6535],
+    ],
+    requiredTools: ["Gloves", "Trash bags", "Water bottle"],
+    participants: 30,
+    participantAvatars: [
+      { id: "a13", name: "Isha", initials: "I", color: "bg-sky-500" },
+      { id: "a14", name: "Dev", initials: "D", color: "bg-emerald-500" },
+      { id: "a15", name: "Anu", initials: "A", color: "bg-rose-500" },
+    ],
+    targetImpactKg: 180,
+    reportsFiledKg: 92,
+    physicalIntensity: "Medium",
+    ageSuitability: "Family Friendly",
+    status: "Open",
+    joined: false,
+    completed: false,
+    mapLink: "#",
+    highlight: "Canal-side volunteer shift",
+  },
+  {
+    id: "challenge-6",
+    title: "Koramangala Cleanup Corridor",
+    level: "level-2",
+    badgeLabel: "Deep Dive",
+    badgeClass: "bg-amber-100 text-amber-800",
+    description: "Deep clean the busy Koramangala corridor before the evening rush.",
+    points: 240,
+    locationName: "Koramangala 5th Block",
+    date: "2026-04-04",
+    startTime: "05:00 PM",
+    endTime: "08:30 PM",
+    meetupTime: "Friday • 05:00 PM",
+    meetupInstructions: "Meet outside the main mall entrance next to the taxi stand.",
+    weather: { condition: "Clear", temperature: "29°C", icon: "☀️" },
+    lat: 12.9250,
+    lng: 77.6198,
+    areaCoordinates: [
+      [12.9260, 77.6180],
+      [12.9245, 77.6204],
+      [12.9239, 77.6195],
+      [12.9248, 77.6182],
+    ],
+    requiredTools: ["Gloves", "Trash bags", "Street brooms"],
+    participants: 42,
+    participantAvatars: [
+      { id: "a16", name: "Ishaan", initials: "I", color: "bg-teal-500" },
+      { id: "a17", name: "Sana", initials: "S", color: "bg-pink-500" },
+      { id: "a18", name: "Naveen", initials: "N", color: "bg-indigo-500" },
+    ],
+    targetImpactKg: 250,
+    reportsFiledKg: 135,
+    physicalIntensity: "High",
+    ageSuitability: "Adults Only",
+    status: "Open",
+    joined: false,
+    completed: false,
+    mapLink: "#",
+    highlight: "High-traffic commercial zone",
+  },
+  {
+    id: "challenge-7",
+    title: "Industrial Park Community Patrol",
+    level: "level-3",
+    badgeLabel: "Patrol",
+    badgeClass: "bg-red-100 text-red-800",
+    description: "Mobilize teams across the industrial park for a controlled cleanup patrol.",
+    points: 380,
+    locationName: "Bengaluru Industrial Park",
+    date: "2026-04-05",
+    startTime: "07:00 AM",
+    endTime: "03:00 PM",
+    meetupTime: "Saturday • 07:00 AM",
+    meetupInstructions: "Meet by the north loading dock near Gate 5; look for the blue banner.",
+    weather: { condition: "Partly cloudy", temperature: "30°C", icon: "⛅" },
+    lat: 12.9109,
+    lng: 77.5348,
+    areaCoordinates: [
+      [12.9121, 77.5334],
+      [12.9113, 77.5361],
+      [12.9098, 77.5355],
+      [12.9102, 77.5327],
+    ],
+    requiredTools: ["Gloves", "Safety vests", "High-visibility jackets"],
+    participants: 40,
+    participantAvatars: [
+      { id: "a19", name: "Rhea", initials: "R", color: "bg-orange-500" },
+      { id: "a20", name: "Karan", initials: "K", color: "bg-cyan-500" },
+      { id: "a21", name: "Tanya", initials: "T", color: "bg-green-500" },
+    ],
+    targetImpactKg: 360,
+    reportsFiledKg: 190,
+    physicalIntensity: "High",
+    ageSuitability: "Adults Only",
+    status: "Urgent",
+    joined: false,
+    completed: false,
+    mapLink: "#",
+    highlight: "Large team coordination",
+  },
+  {
+    id: "challenge-8",
+    title: "Coastal Stretch Patrol",
+    level: "level-3",
+    badgeLabel: "Patrol",
+    badgeClass: "bg-red-100 text-red-800",
+    description: "Coordinate a beach cleanup patrol across the coastal stretch.",
+    points: 460,
+    locationName: "Bengaluru Coastal Road",
+    date: "2026-04-06",
+    startTime: "06:00 AM",
+    endTime: "12:00 PM",
+    meetupTime: "Sunday • 06:00 AM",
+    meetupInstructions: "Meet by the beachfront kiosk near the north pier; look for the turquoise flag.",
+    weather: { condition: "Clear", temperature: "27°C", icon: "🌤️" },
+    lat: 12.9542,
+    lng: 77.4900,
+    areaCoordinates: [
+      [12.9560, 77.4885],
+      [12.9548, 77.4920],
+      [12.9532, 77.4912],
+      [12.9538, 77.4880],
+    ],
+    requiredTools: ["Buckets", "Gloves", "Rakes", "Garbage nets"],
+    participants: 44,
+    participantAvatars: [
+      { id: "a22", name: "Vikram", initials: "V", color: "bg-emerald-500" },
+      { id: "a23", name: "Aanya", initials: "A", color: "bg-sky-500" },
+      { id: "a24", name: "Rohit", initials: "R", color: "bg-rose-500" },
+    ],
+    targetImpactKg: 320,
+    reportsFiledKg: 180,
+    physicalIntensity: "High",
+    ageSuitability: "Adults Only",
+    status: "Filling Fast",
+    joined: false,
+    completed: false,
+    mapLink: "#",
+    highlight: "Strong turnout expected",
+  },
+];
+
+const randomRange = (min: number, max: number) => Number((Math.random() * (max - min) + min).toFixed(2));
+const randomOffset = () => (Math.random() - 0.5) * 0.02;
+
+const getDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return 6371 * c;
+};
+
+const reduceHeatmapIntensity = (reports: HeatmapReport[], challenge: ChallengeCard) =>
+  reports.map((report) => {
+    const distance = getDistanceKm(report.lat, report.lng, challenge.lat, challenge.lng);
+    if (distance <= 2) {
+      return {
+        ...report,
+        intensity: Number(Math.max(0.12, report.intensity * 0.65).toFixed(2)),
+      };
+    }
+    return report;
+  });
+
+const createHeatmapReport = (): HeatmapReport => {
+  const baseLat = 12.94 + randomOffset();
+  const baseLng = 77.62 + randomOffset();
+  const kg = Math.floor(Math.random() * 6) + 1;
+  const intensity = Number((0.4 + Math.random() * 0.6).toFixed(2));
+  return {
+    id: `report-${Date.now()}`,
+    lat: Number((baseLat + randomOffset()).toFixed(5)),
+    lng: Number((baseLng + randomOffset()).toFixed(5)),
+    intensity,
+    label: `Rapid Response Report (${kg} kg)` ,
+    description: `${kg} kg of plastic waste reported in a new hotspot.`,
+    createdAt: new Date().toISOString(),
+  };
+};
+
+interface RecycleHubContextValue {
+  heatmapReports: HeatmapReport[];
+  heatmapPoints: [number, number, number][];
+  challenges: ChallengeCard[];
+  selectedChallengeId: string | null;
+  selectedChallenge: ChallengeCard | null;
+  setSelectedChallengeId: (id: string) => void;
+  setSelectedChallenge: (id: string) => void;
+  joinChallenge: (id: string) => Promise<boolean>;
+  globalMetrics: GlobalMetrics;
+  supplierApplications: SupplierApplication[];
+  sourcingRequests: SourcingRequest[];
+  trackOrders: OrderTracker[];
+  pickupQueue: PickupBooking[];
+  completedPickups: PickupBooking[];
+  recentActivity: RecentActivityItem[];
+  topRecyclers: TopRecycler[];
+  leaderboardUsers: LeaderboardUser[];
+  userBalance: number;
+  availableMarketCredits: number;
+  fullTransactionList: MarketTransaction[];
+  quickActionStats: QuickActionStats;
+  addTransaction: (transaction: Omit<MarketTransaction, "id" | "createdAt">) => void;
+  depositPoints: (amount: number, note?: string) => { ok: true } | { ok: false; error: string };
+  withdrawPoints: (amount: number, note?: string) => { ok: true } | { ok: false; error: string };
+  addSourcingRequest: (request: Omit<SourcingRequest, "id">) => SourcingRequest;
+  addTrackOrder: (order: Omit<OrderTracker, "id"> & { id?: string }) => OrderTracker;
+  updateTrackOrderStatus: (orderId: string, status: OrderTracker["status"]) => void;
+  bookPickup: (payload: Omit<PickupBooking, "id" | "status" | "pointsAwarded" | "createdAt">) => Promise<PickupBooking>;
+  completePickup: (bookingId: string, actualWeightKg?: number) => PickupBooking | null;
+  completePurchase: (quantity: number) => boolean;
+  refreshAllData: () => void;
+}
+
+const MarketContext = createContext<RecycleHubContextValue | undefined>(undefined);
+
+function useProvideRecycleHub() {
+  const [heatmapReports, setHeatmapReports] = useState<HeatmapReport[]>(INITIAL_HEATMAP_REPORTS);
+  const [challenges, setChallenges] = useState<ChallengeCard[]>(INITIAL_CHALLENGES);
+  const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(INITIAL_CHALLENGES[0]?.id ?? null);
+  const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics>(INITIAL_GLOBAL_METRICS);
+  const [supplierApplications, setSupplierApplications] = useState<SupplierApplication[]>(INITIAL_SUPPLIER_APPLICATIONS);
+  const [sourcingRequests, setSourcingRequests] = useState<SourcingRequest[]>(INITIAL_SOURCING_REQUESTS);
+  const [trackOrders, setTrackOrders] = useState<OrderTracker[]>(INITIAL_TRACK_ORDERS);
+  const [pickupQueue, setPickupQueue] = useState<PickupBooking[]>([]);
+  const [completedPickups, setCompletedPickups] = useState<PickupBooking[]>([]);
+  const [recentActivity, setRecentActivity] = useState<RecentActivityItem[]>(INITIAL_RECENT_ACTIVITY);
+  const [topRecyclers, setTopRecyclers] = useState<TopRecycler[]>(INITIAL_TOP_RECYCLERS);
+  const [leaderboardUsers, setLeaderboardUsers] = useState<LeaderboardUser[]>(INITIAL_LEADERBOARD_USERS);
+  const [quickActionStats, setQuickActionStats] = useState<QuickActionStats>(INITIAL_QUICK_ACTION_STATS);
+  const [userBalance, setUserBalance] = useState<number>(0);
+  const [availableMarketCredits, setAvailableMarketCredits] = useState<number>(200);
+  const [fullTransactionList, setFullTransactionList] = useState<MarketTransaction[]>([]);
+  const [joinedChallengeIds, setJoinedChallengeIds] = useState<Set<string>>(new Set());
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Only restore non-user-specific UI state from localStorage.
+    // User balance and stats are loaded from Supabase in the auth effect below.
+    const storedAvailableCredits = window.localStorage.getItem(MARKET_STORAGE_KEYS.availableMarketCredits);
+    const storedTransactions = window.localStorage.getItem(MARKET_STORAGE_KEYS.transactions);
+
+    if (storedAvailableCredits !== null) {
+      setAvailableMarketCredits(Number(storedAvailableCredits));
+    }
+
+    if (storedTransactions) {
+      try {
+        const parsed = JSON.parse(storedTransactions) as MarketTransaction[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setFullTransactionList(parsed);
+        }
+      } catch {
+        // leave as empty array
+      }
+    }
+
+    const storedMetrics = window.localStorage.getItem(MARKET_STORAGE_KEYS.globalMetrics);
+    if (storedMetrics) {
+      try {
+        const parsed = JSON.parse(storedMetrics) as GlobalMetrics;
+        setGlobalMetrics(parsed);
+      } catch {
+        setGlobalMetrics(INITIAL_GLOBAL_METRICS);
+      }
+    }
+
+    const storedChallenges = window.localStorage.getItem(MARKET_STORAGE_KEYS.challenges);
+    if (storedChallenges) {
+      try {
+        const parsed = JSON.parse(storedChallenges) as ChallengeCard[];
+        if (Array.isArray(parsed)) {
+          setChallenges(parsed);
+        }
+      } catch {
+        setChallenges(INITIAL_CHALLENGES);
+      }
+    }
+
+    const storedJoined = window.localStorage.getItem(MARKET_STORAGE_KEYS.joinedChallengeIds);
+    if (storedJoined) {
+      try {
+        const parsed = JSON.parse(storedJoined) as string[];
+        if (Array.isArray(parsed)) {
+          setJoinedChallengeIds(new Set(parsed));
+        }
+      } catch {
+        setJoinedChallengeIds(new Set());
+      }
+    }
+
+    const storedRecentActivity = window.localStorage.getItem(MARKET_STORAGE_KEYS.recentActivity);
+    if (storedRecentActivity) {
+      try {
+        const parsed = JSON.parse(storedRecentActivity) as RecentActivityItem[];
+        if (Array.isArray(parsed)) {
+          setRecentActivity(parsed);
+        }
+      } catch {
+        setRecentActivity(INITIAL_RECENT_ACTIVITY);
+      }
+    }
+
+    const storedTopRecyclers = window.localStorage.getItem(MARKET_STORAGE_KEYS.topRecyclers);
+    if (storedTopRecyclers) {
+      try {
+        const parsed = JSON.parse(storedTopRecyclers) as TopRecycler[];
+        if (Array.isArray(parsed)) {
+          setTopRecyclers(parsed);
+        }
+      } catch {
+        setTopRecyclers(INITIAL_TOP_RECYCLERS);
+      }
+    }
+
+    const storedQuickActionStats = window.localStorage.getItem(MARKET_STORAGE_KEYS.quickActionStats);
+    if (storedQuickActionStats) {
+      try {
+        const parsed = JSON.parse(storedQuickActionStats) as QuickActionStats;
+        setQuickActionStats(parsed);
+      } catch {
+        setQuickActionStats(INITIAL_QUICK_ACTION_STATS);
+      }
+    }
+
+    const storedSourcingRequests = window.localStorage.getItem(MARKET_STORAGE_KEYS.sourcingRequests);
+    if (storedSourcingRequests) {
+      try {
+        const parsed = JSON.parse(storedSourcingRequests) as SourcingRequest[];
+        if (Array.isArray(parsed)) {
+          setSourcingRequests(parsed);
+        }
+      } catch {
+        setSourcingRequests(INITIAL_SOURCING_REQUESTS);
+      }
+    }
+
+    const storedTrackOrders = window.localStorage.getItem(MARKET_STORAGE_KEYS.trackOrders);
+    if (storedTrackOrders) {
+      try {
+        const parsed = JSON.parse(storedTrackOrders) as OrderTracker[];
+        if (Array.isArray(parsed)) {
+          setTrackOrders(parsed);
+        }
+      } catch {
+        setTrackOrders(INITIAL_TRACK_ORDERS);
+      }
+    }
+
+    const storedPickupQueue = window.localStorage.getItem(MARKET_STORAGE_KEYS.pickupQueue);
+    if (storedPickupQueue) {
+      try {
+        const parsed = JSON.parse(storedPickupQueue) as PickupBooking[];
+        if (Array.isArray(parsed)) setPickupQueue(parsed);
+      } catch {
+        setPickupQueue([]);
+      }
+    }
+
+    const storedCompletedPickups = window.localStorage.getItem(MARKET_STORAGE_KEYS.completedPickups);
+    if (storedCompletedPickups) {
+      try {
+        const parsed = JSON.parse(storedCompletedPickups) as PickupBooking[];
+        if (Array.isArray(parsed)) setCompletedPickups(parsed);
+      } catch {
+        setCompletedPickups([]);
+      }
+    }
+  }, []);
+
+  // If authenticated, load wallet balance from the database profile so it stays consistent across devices.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProfileBalance() {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const user = auth.user;
+        if (!user) {
+          if (!cancelled) setAuthUserId(null);
+          return;
+        }
+
+        // Clear stale localStorage data when a different user logs in
+        const storedUid = window.localStorage.getItem("recyclehub_auth_user_id");
+        if (storedUid && storedUid !== user.id) {
+          Object.values(MARKET_STORAGE_KEYS).forEach((key) => window.localStorage.removeItem(key));
+          window.localStorage.removeItem("eco_sync_state");
+        }
+        window.localStorage.setItem("recyclehub_auth_user_id", user.id);
+
+        if (!cancelled) setAuthUserId(user.id);
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("coin_balance, total_pickups, total_recycled_kg, total_points, referral_count, consecutive_weeks")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (!cancelled && profile) {
+          const p = profile as any;
+          const balance = typeof p.coin_balance === "number" ? p.coin_balance : 0;
+          const pickups = typeof p.total_pickups === "number" ? p.total_pickups : 0;
+          const kg = typeof p.total_recycled_kg === "number" ? p.total_recycled_kg : 0;
+          const points = typeof p.total_points === "number" ? p.total_points : 0;
+          const referrals = typeof p.referral_count === "number" ? p.referral_count : 0;
+          const weeks = typeof p.consecutive_weeks === "number" ? p.consecutive_weeks : 0;
+
+          setUserBalance(balance);
+
+          // Sync quickActionStats from real profile data
+          setQuickActionStats((prev) => ({
+            ...prev,
+            bookPickup: { ...prev.bookPickup, recentPickups: pickups },
+            myImpact: { totalWasteDivertedKg: kg },
+            wallet: { ...prev.wallet, balance, lastEarned: 0 },
+            achievements: { ...prev.achievements, badgesEarned: 0 },
+            referrals: { ...prev.referrals, successfulReferrals: referrals, pendingRewardCredits: 0 },
+          }));
+        }
+      } catch {
+        // If Supabase isn't available, localStorage-backed balance still works.
+      }
+    }
+    loadProfileBalance();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Real-time subscription: when any recycling_pickup is inserted or updated,
+  // refresh the pickup queue so pickers see new bookings instantly.
+  useEffect(() => {
+    const channel = supabase
+      .channel("pickup-feed")
+      .on(
+        "postgres_changes" as any,
+        { event: "INSERT", schema: "public", table: "recycling_pickups" },
+        (payload: any) => {
+          const row = payload.new;
+          const newBooking: PickupBooking = {
+            id: row.id,
+            userName: "Recycler",
+            date: row.pickup_date,
+            timeSlot: "morning",
+            weightKg: row.weight_kg,
+            address: "",
+            status: row.status === "completed" ? "Completed" : "Pending",
+            pointsAwarded: row.points_earned ?? 0,
+            createdAt: row.created_at,
+          };
+          setPickupQueue((prev) => {
+            if (prev.some((p) => p.id === row.id)) return prev;
+            return [newBooking, ...prev];
+          });
+          setGlobalMetrics((prev) => ({
+            ...prev,
+            totalPlasticRecycledKg: Number((prev.totalPlasticRecycledKg + row.weight_kg).toFixed(1)),
+          }));
+        }
+      )
+      .on(
+        "postgres_changes" as any,
+        { event: "UPDATE", schema: "public", table: "recycling_pickups" },
+        (payload: any) => {
+          const row = payload.new;
+          setPickupQueue((prev) =>
+            prev.map((p) =>
+              p.id === row.id
+                ? { ...p, status: row.status === "completed" ? "Completed" : "Pending", pointsAwarded: row.points_earned ?? 0 }
+                : p
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    const livePickerInterval = window.setInterval(() => {
+      setGlobalMetrics((current) => ({
+        ...current,
+        livePickersOnline: randomInt(35, 52),
+      }));
+    }, 7000);
+
+    const tickerInterval = window.setInterval(() => {
+      setGlobalMetrics((current) => ({
+        ...current,
+        totalPlasticRecycledKg: Number((current.totalPlasticRecycledKg + Number((Math.random() * 0.8 + 0.3).toFixed(1))).toFixed(1)),
+        totalCarbonCredits: current.totalCarbonCredits + randomInt(1, 3),
+      }));
+    }, 10000);
+
+    return () => {
+      window.clearInterval(livePickerInterval);
+      window.clearInterval(tickerInterval);
+    };
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const newReport = createHeatmapReport();
+      setHeatmapReports((prev) => [newReport, ...prev].slice(0, 80));
+      setChallenges((prev) =>
+        prev.map((challenge) =>
+          challenge.id === prev[Math.floor(Math.random() * prev.length)].id
+            ? {
+                ...challenge,
+                participants: challenge.participants + Math.floor(Math.random() * 3),
+              }
+            : challenge
+        )
+      );
+    }, 5000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    const transactionInterval = window.setInterval(() => {
+      const mockTx = createMockMarketTransaction();
+      setFullTransactionList((prev) => [mockTx, ...prev].slice(0, 50));
+    }, 60000);
+
+    return () => window.clearInterval(transactionInterval);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.userBalance, String(userBalance));
+  }, [userBalance]);
+
+  // Persist wallet balance back to Supabase when logged in.
+  useEffect(() => {
+    if (!authUserId) return;
+    const timeout = window.setTimeout(async () => {
+      try {
+        await supabase
+          .from("profiles")
+          .update({ coin_balance: userBalance })
+          .eq("id", authUserId);
+      } catch {
+        // Non-fatal; local state remains correct.
+      }
+    }, 350);
+
+    return () => window.clearTimeout(timeout);
+  }, [authUserId, userBalance]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.availableMarketCredits, String(availableMarketCredits));
+  }, [availableMarketCredits]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.transactions, JSON.stringify(fullTransactionList));
+  }, [fullTransactionList]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.globalMetrics, JSON.stringify(globalMetrics));
+  }, [globalMetrics]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.challenges, JSON.stringify(challenges));
+  }, [challenges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.joinedChallengeIds, JSON.stringify(Array.from(joinedChallengeIds)));
+  }, [joinedChallengeIds]);
+
+  // Ensure joined state survives refresh even if challenges are reseeded/updated.
+  useEffect(() => {
+    if (joinedChallengeIds.size === 0) return;
+    setChallenges((prev) =>
+      prev.map((challenge) => (joinedChallengeIds.has(challenge.id) ? { ...challenge, joined: true } : challenge))
+    );
+  }, [joinedChallengeIds]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.recentActivity, JSON.stringify(recentActivity));
+  }, [recentActivity]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.topRecyclers, JSON.stringify(topRecyclers));
+  }, [topRecyclers]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.quickActionStats, JSON.stringify(quickActionStats));
+  }, [quickActionStats]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.sourcingRequests, JSON.stringify(sourcingRequests));
+  }, [sourcingRequests]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.trackOrders, JSON.stringify(trackOrders));
+  }, [trackOrders]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.pickupQueue, JSON.stringify(pickupQueue));
+  }, [pickupQueue]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARKET_STORAGE_KEYS.completedPickups, JSON.stringify(completedPickups));
+  }, [completedPickups]);
+
+  // Sync userBalance with quickActionStats and leaderboard
+  useEffect(() => {
+    if (leaderboardUsers.length > 0) {
+      // Update quick action stats wallet when userBalance changes
+      setQuickActionStats((prev) => ({
+        ...prev,
+        wallet: {
+          ...prev.wallet,
+          balance: userBalance,
+        },
+      }));
+
+      // Recalculate leaderboard ranks when userBalance changes
+      setLeaderboardUsers((prev) => {
+        const currentUserIdx = prev.findIndex((u) => u.isCurrentUser);
+        if (currentUserIdx !== -1) {
+          prev[currentUserIdx] = {
+            ...prev[currentUserIdx],
+            credits: userBalance,
+          };
+        }
+
+        const sorted = [...prev].sort((a, b) => b.credits - a.credits);
+        return sorted.map((user, idx) => ({
+          ...user,
+          rank: idx + 1,
+        }));
+      });
+    }
+  }, [userBalance]);
+
+  const heatmapPoints = useMemo(
+    () => heatmapReports.map((report) => [report.lat, report.lng, report.intensity] as [number, number, number]),
+    [heatmapReports]
+  );
+
+  const selectedChallenge = useMemo(
+    () => (selectedChallengeId ? challenges.find((challenge) => challenge.id === selectedChallengeId) ?? null : null),
+    [challenges, selectedChallengeId]
+  );
+
+  const setSelectedChallenge = (challengeId: string) => {
+    setSelectedChallengeId(challengeId);
+  };
+
+  const refreshAllData = () => {
+    // Recalculate leaderboard ranks based on current user balance
+    let currentUserNewRank = 12;
+    
+    setLeaderboardUsers((prev) => {
+      // Find current user and update their credits
+      const currentUserIdx = prev.findIndex((u) => u.isCurrentUser);
+      if (currentUserIdx !== -1) {
+        prev[currentUserIdx] = {
+          ...prev[currentUserIdx],
+          credits: userBalance,
+          kgRecycled: quickActionStats.myImpact.totalWasteDivertedKg,
+        };
+      }
+
+      // Sort by credits and recalculate ranks
+      const sorted = [...prev].sort((a, b) => b.credits - a.credits);
+      const rankedUsers = sorted.map((user, idx) => ({
+        ...user,
+        rank: idx + 1,
+      }));
+      
+      // Extract current user's new rank
+      const currentUser = rankedUsers.find((u) => u.isCurrentUser);
+      if (currentUser) {
+        currentUserNewRank = currentUser.rank;
+      }
+      
+      return rankedUsers;
+    });
+
+    // Update quick action stats to reflect current state
+    setQuickActionStats((prev) => ({
+      ...prev,
+      wallet: {
+        ...prev.wallet,
+        balance: userBalance,
+      },
+      myImpact: {
+        ...prev.myImpact,
+        totalWasteDivertedKg: prev.myImpact.totalWasteDivertedKg,
+      },
+      leaderboard: {
+        ...prev.leaderboard,
+        rank: currentUserNewRank,
+      },
+    }));
+  };
+
+  const joinChallenge = async (challengeId: string) => {
+    // Prevent duplicate joins (double-clicks, rapid taps, re-renders).
+    if (joinedChallengeIds.has(challengeId)) return false;
+
+    const current = challenges.find((c) => c.id === challengeId);
+    if (!current) return false;
+
+    // Mark joined immediately for UI feedback.
+    setJoinedChallengeIds((prev) => new Set(prev).add(challengeId));
+    setChallenges((prev) =>
+      prev.map((challenge) =>
+        challenge.id === challengeId
+          ? {
+              ...challenge,
+              joined: true,
+              completed: challenge.participants + 1 >= 50,
+              participants: challenge.participants + 1,
+            }
+          : challenge
+      )
+    );
+
+    // Side-effects (rewards + metrics) are applied once.
+    const rewardCredits = current.points * 10;
+    setHeatmapReports((reports) => reduceHeatmapIntensity(reports, current));
+    setUserBalance((prev) => prev + rewardCredits);
+    setGlobalMetrics((prev) => ({ ...prev, livePickersOnline: Math.min(prev.livePickersOnline + 1, 99) }));
+
+    const impactIncrease = Math.round(current.targetImpactKg * 0.5);
+    setQuickActionStats((prev) => ({
+      ...prev,
+      wallet: { ...prev.wallet, lastEarned: rewardCredits },
+      myImpact: { totalWasteDivertedKg: prev.myImpact.totalWasteDivertedKg + impactIncrease },
+    }));
+    setGlobalMetrics((prev) => ({
+      ...prev,
+      totalPlasticRecycledKg: Number((prev.totalPlasticRecycledKg + impactIncrease).toFixed(1)),
+    }));
+    addTransaction({
+      description: `Challenge joined: ${current.title}`,
+      amount: rewardCredits,
+      status: "Complete",
+      type: "Challenge Reward",
+    });
+
+    // Database persistence: update authenticated user's profile counters where available.
+    // Challenge membership is persisted locally (no challenges table in current schema).
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth.user;
+      if (user) {
+        const { data: existing } = await supabase
+          .from("profiles")
+          .select("coin_balance,total_points")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        const coinBalance = (existing?.coin_balance ?? 0) + rewardCredits;
+        const totalPoints = (existing?.total_points ?? 0) + rewardCredits;
+
+        // Persist the reward so it survives refresh and shows up cross-app.
+        await supabase
+          .from("profiles")
+          .update({ coin_balance: coinBalance, total_points: totalPoints })
+          .eq("id", user.id);
+      }
+    } catch {
+      // If offline / no auth, local state still works and is persisted via localStorage.
+    }
+
+    return true;
+  };
+
+  const addTransaction = (transaction: Omit<MarketTransaction, "id" | "createdAt">) => {
+    setFullTransactionList((prev) => [createMarketTransaction(transaction), ...prev].slice(0, 50));
+  };
+
+  const depositPoints = (amount: number, note?: string) => {
+    if (!Number.isFinite(amount) || amount <= 0) return { ok: false as const, error: "Deposit amount must be greater than 0." };
+    const rounded = Math.floor(amount);
+    setUserBalance((prev) => prev + rounded);
+    addTransaction({
+      description: note?.trim() ? note.trim() : "Wallet deposit",
+      amount: rounded,
+      status: "Complete",
+      type: "Market Stream",
+    });
+    return { ok: true as const };
+  };
+
+  const withdrawPoints = (amount: number, note?: string) => {
+    if (!Number.isFinite(amount) || amount <= 0) return { ok: false as const, error: "Withdrawal amount must be greater than 0." };
+    const rounded = Math.floor(amount);
+    if (rounded > userBalance) return { ok: false as const, error: "Insufficient balance." };
+    setUserBalance((prev) => prev - rounded);
+    addTransaction({
+      description: note?.trim() ? note.trim() : "Wallet withdrawal",
+      amount: -rounded,
+      status: "Complete",
+      type: "Market Stream",
+    });
+    return { ok: true as const };
+  };
+
+  const addSourcingRequest = (request: Omit<SourcingRequest, "id">) => {
+    const newRequest: SourcingRequest = {
+      ...request,
+      id: `req-${Date.now()}`,
+    };
+    setSourcingRequests((prev) => [newRequest, ...prev]);
+    return newRequest;
+  };
+
+  const addTrackOrder = (order: Omit<OrderTracker, "id"> & { id?: string }) => {
+    const newOrder: OrderTracker = {
+      ...order,
+      id: order.id ?? `ORD-${Date.now()}`,
+    };
+    setTrackOrders((prev) => [newOrder, ...prev]);
+    return newOrder;
+  };
+
+  const updateTrackOrderStatus = (orderId: string, status: OrderTracker["status"]) => {
+    setTrackOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+  };
+
+  const bookPickup = async (payload: Omit<PickupBooking, "id" | "status" | "pointsAwarded" | "createdAt">) => {
+    const booking: PickupBooking = {
+      id: `PK-${Date.now().toString(36).toUpperCase()}`,
+      ...payload,
+      status: "Pending",
+      pointsAwarded: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Write to Supabase so pickers can see it in real-time
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (auth.user) {
+        await supabase.from("recycling_pickups").insert({
+          user_id: auth.user.id,
+          pickup_date: payload.date,
+          weight_kg: payload.weightKg,
+          points_earned: 0,
+          status: "pending",
+        });
+      }
+    } catch {
+      // Non-fatal — local state still reflects the booking
+    }
+
+    setPickupQueue((prev) => [booking, ...prev]);
+    setQuickActionStats((prev) => ({
+      ...prev,
+      bookPickup: {
+        nextScheduled: `${booking.date}, ${booking.timeSlot}`,
+        recentPickups: prev.bookPickup.recentPickups + 1,
+      },
+    }));
+    setRecentActivity((prev) => [
+      { id: `act-${Date.now()}`, desc: `${booking.userName} booked a pickup`, pts: "+0", date: "Today" },
+      ...prev,
+    ].slice(0, 20));
+
+    return booking;
+  };
+
+  const completePickup = (bookingId: string, actualWeightKg?: number) => {
+    const existing = pickupQueue.find((p) => p.id === bookingId);
+    if (!existing) return null;
+
+    const weight = Math.max(0.1, actualWeightKg ?? existing.weightKg);
+    const points = Math.round(weight * 100);
+    const completed: PickupBooking = { ...existing, weightKg: weight, status: "Completed", pointsAwarded: points };
+
+    setPickupQueue((prev) => prev.filter((p) => p.id !== bookingId));
+    setCompletedPickups((prev) => [completed, ...prev]);
+    setUserBalance((prev) => prev + points);
+    setQuickActionStats((prev) => ({
+      ...prev,
+      myImpact: { totalWasteDivertedKg: prev.myImpact.totalWasteDivertedKg + weight },
+      wallet: { ...prev.wallet, balance: prev.wallet.balance + points, lastEarned: points },
+    }));
+    setGlobalMetrics((prev) => ({
+      ...prev,
+      totalPlasticRecycledKg: Number((prev.totalPlasticRecycledKg + weight).toFixed(1)),
+      totalCarbonCredits: prev.totalCarbonCredits + Math.max(1, Math.round(weight * 0.4)),
+    }));
+    setRecentActivity((prev) => [
+      { id: `act-${Date.now()}`, desc: `${existing.userName} completed pickup`, pts: `+${points}`, date: "Today" },
+      ...prev,
+    ].slice(0, 20));
+    addTransaction({
+      description: `Pickup completed (${weight.toFixed(1)} kg)`,
+      amount: points,
+      status: "Complete",
+      type: "Market Stream",
+    });
+
+    return completed;
+  };
+
+  const completePurchase = (quantity: number) => {
+    if (quantity < 1 || quantity > availableMarketCredits) {
+      return false;
+    }
+
+    setAvailableMarketCredits((prev) => prev - quantity);
+    setUserBalance((prev) => prev + quantity);
+    addTransaction({
+      description: "Market Purchase",
+      amount: quantity,
+      status: "Complete",
+      type: "Market Purchase",
+    });
+
+    return true;
+  };
+
+  // ── Global pickup completion listener ────────────────────────────────────────
+  // Subscribes to the event bus in usePickupSchedule so that whenever a picker
+  // completes a transaction, the recycler's wallet, impact stats, dashboard
+  // metrics, and recent activity all update in real-time without a page reload.
+  useEffect(() => {
+    const unsub = subscribeToCompletions((e: { weight_kg: number; credits: number; recycler_name: string; picker_name: string }) => {
+      const { weight_kg, credits, recycler_name, picker_name } = e;
+
+      // 1. Wallet: add credits
+      setUserBalance((prev) => prev + credits);
+
+      // 2. Impact: total plastic recycled + CO2 saved (0.84 kg CO2 per kg plastic)
+      setQuickActionStats((prev) => ({
+        ...prev,
+        myImpact: { totalWasteDivertedKg: Number((prev.myImpact.totalWasteDivertedKg + weight_kg).toFixed(1)) },
+        wallet: { ...prev.wallet, balance: prev.wallet.balance + credits, lastEarned: credits },
+        bookPickup: { ...prev.bookPickup, recentPickups: prev.bookPickup.recentPickups + 1 },
+      }));
+
+      // 3. Global metrics
+      setGlobalMetrics((prev) => ({
+        ...prev,
+        totalPlasticRecycledKg: Number((prev.totalPlasticRecycledKg + weight_kg).toFixed(1)),
+        totalCarbonCredits: prev.totalCarbonCredits + credits,
+      }));
+
+      // 4. Recent activity feed
+      setRecentActivity((prev) => [
+        {
+          id: `act-${Date.now()}`,
+          desc: `${picker_name} completed pickup for ${recycler_name}`,
+          pts: `+${credits}`,
+          date: "Today",
+        },
+        ...prev,
+      ].slice(0, 20));
+
+      // 5. Transaction log
+      addTransaction({
+        description: `Pickup completed (${weight_kg.toFixed(1)} kg) by ${picker_name}`,
+        amount: credits,
+        status: "Complete",
+        type: "Market Stream",
+      });
+
+      // 6. Persist to Supabase profile (fire-and-forget)
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return;
+        supabase.rpc("increment_recycler_stats" as any, {
+          p_user_id: user.id,
+          p_weight_kg: weight_kg,
+          p_credits: credits,
+        }).then(({ error }) => {
+          if (error) {
+            // Fallback: plain SQL update using current profile values
+            supabase
+              .from("profiles")
+              .select("total_recycled_kg, coin_balance, total_pickups")
+              .eq("id", user.id)
+              .maybeSingle()
+              .then(({ data: row }) => {
+                if (!row) return;
+                const r = row as { total_recycled_kg: number; coin_balance: number; total_pickups: number };
+                supabase.from("profiles").update({
+                  total_recycled_kg: Number((r.total_recycled_kg + weight_kg).toFixed(2)),
+                  coin_balance: r.coin_balance + credits,
+                  total_pickups: r.total_pickups + 1,
+                }).eq("id", user.id);
+              });
+          }
+        });
+      });
+    });
+    return unsub;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return {
+    heatmapReports,
+    heatmapPoints,
+    challenges,
+    selectedChallengeId,
+    selectedChallenge,
+    setSelectedChallengeId,
+    setSelectedChallenge,
+    joinChallenge,
+    globalMetrics,
+    supplierApplications,
+    sourcingRequests,
+    trackOrders,
+    pickupQueue,
+    completedPickups,
+    userBalance,
+    availableMarketCredits,
+    fullTransactionList,
+    recentActivity,
+    topRecyclers,
+    leaderboardUsers,
+    quickActionStats,
+    addTransaction,
+    depositPoints,
+    withdrawPoints,
+    addSourcingRequest,
+    addTrackOrder,
+    updateTrackOrderStatus,
+    bookPickup,
+    completePickup,
+    completePurchase,
+    refreshAllData,
+  };
+}
+
+export function RecycleHubProvider({ children }: { children: ReactNode }) {
+  const value = useProvideRecycleHub();
+  return <MarketContext.Provider value={value}>{children}</MarketContext.Provider>;
+}
+
+export function useRecycleHub() {
+  const context = useContext(MarketContext);
+  if (!context) {
+    throw new Error("useRecycleHub must be used within a RecycleHubProvider");
+  }
+  return context;
+}
+
+export function useMarket() {
+  return useRecycleHub();
+}

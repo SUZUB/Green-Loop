@@ -1,0 +1,267 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Zero Margin — Emerald Mint Light Theme ── */
+    --bg-base:          #F9FAFB;   /* Ghost White */
+    --bg-mid:           #F0FDF4;   /* Pale mint tint */
+    --surface:          #FFFFFF;
+    --surface-2:        #F0FDF4;   /* Soft Spring Green tint */
+    --border-light:     #D1FAE5;   /* Mint-tinted border */
+    --border-subtle:    #E2E8F0;   /* Neutral fallback */
+    --green-action:     #10B981;   /* Emerald Mint — primary action */
+    --green-action-hover: #059669; /* Darker emerald on hover */
+    --green-btn:        #34D399;   /* Vibrant Mint — CTA buttons */
+    --green-btn-hover:  #A7F3D0;   /* Seafoam hover */
+    --green-deep:       #14532D;   /* Deep Sage — text/icons */
+    --green-icon-bg:    #DCFCE7;   /* Soft Spring Green — icon containers */
+    --green-icon:       #065F46;   /* Dark Emerald — icons inside containers */
+    --green-mint-bg:    #D1FAE5;   /* Mint highlight */
+    --text-primary:     #1E293B;   /* Charcoal Gray */
+    --text-secondary:   #475569;   /* Slate */
+    --text-muted:       #94A3B8;
+    --badge-verified-bg:  #ECFCCB; /* Pale Lime */
+    --badge-verified-text: #3F6212; /* Olive Green */
+    --status-pending:   #D97706;
+    --status-active:    #0284C7;
+    --status-done:      #16A34A;
+
+    /* ── Shadcn/Radix bridge ── */
+    --background:       0 0% 98%;        /* #F9FAFB */
+    --foreground:       215 28% 17%;     /* #1E293B */
+    --card:             0 0% 100%;
+    --card-foreground:  215 28% 17%;
+    --popover:          0 0% 100%;
+    --popover-foreground: 215 28% 17%;
+    --primary:          160 84% 39%;     /* #10B981 */
+    --primary-foreground: 0 0% 100%;
+    --secondary:        138 77% 97%;     /* #F0FDF4 */
+    --secondary-foreground: 215 28% 17%;
+    --muted:            138 77% 97%;
+    --muted-foreground: 215 16% 47%;
+    --accent:           138 77% 93%;     /* #DCFCE7 */
+    --accent-foreground: 166 72% 17%;    /* #14532D */
+    --destructive:      0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border:           152 100% 91%;    /* #D1FAE5 */
+    --input:            214 32% 91%;
+    --ring:             160 84% 39%;     /* #10B981 */
+    --radius:           0.75rem;
+
+    --earth:            30 60% 50%;
+    --earth-foreground: 0 0% 100%;
+    --ocean:            200 80% 40%;
+    --ocean-foreground: 0 0% 100%;
+    --leaf:             160 84% 39%;
+    --leaf-foreground:  0 0% 100%;
+    --sand:             35 40% 85%;
+    --warning:          38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --gold:             43 96% 56%;
+    --gold-foreground:  0 0% 100%;
+    --emerald:          160 84% 39%;
+    --emerald-foreground: 0 0% 100%;
+
+    --gradient-hero:    linear-gradient(135deg, #10B981, #059669);
+    --gradient-card:    linear-gradient(145deg, #FFFFFF, #F0FDF4);
+    --gradient-warm:    linear-gradient(135deg, #34D399, #10B981);
+    --shadow-soft:      0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-card:      0 2px 8px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.03);
+    --shadow-elevated:  0 4px 16px rgba(0,0,0,0.07), 0 2px 6px rgba(0,0,0,0.04);
+    --shadow-hover:     0 8px 24px rgba(16,185,129,0.15), 0 3px 8px rgba(0,0,0,0.05);
+
+    --sidebar-background: 138 77% 97%;
+    --sidebar-foreground: 215 28% 17%;
+    --sidebar-primary:    160 84% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:     138 77% 93%;
+    --sidebar-accent-foreground: 166 72% 17%;
+    --sidebar-border:     152 100% 91%;
+    --sidebar-ring:       160 84% 39%;
+  }
+
+  .dark {
+    --background:       0 0% 98%;
+    --foreground:       215 28% 17%;
+    --card:             0 0% 100%;
+    --card-foreground:  215 28% 17%;
+    --popover:          0 0% 100%;
+    --popover-foreground: 215 28% 17%;
+    --primary:          160 84% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary:        138 77% 97%;
+    --secondary-foreground: 215 28% 17%;
+    --muted:            138 77% 97%;
+    --muted-foreground: 215 16% 47%;
+    --accent:           138 77% 93%;
+    --accent-foreground: 166 72% 17%;
+    --destructive:      0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border:           152 100% 91%;
+    --input:            214 32% 91%;
+    --ring:             160 84% 39%;
+    --sidebar-background: 138 77% 97%;
+    --sidebar-foreground: 215 28% 17%;
+    --sidebar-primary:    160 84% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:     138 77% 93%;
+    --sidebar-accent-foreground: 166 72% 17%;
+    --sidebar-border:     152 100% 91%;
+    --sidebar-ring:       160 84% 39%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    background-color: #F9FAFB;
+    color: #1E293B;
+    @apply font-body antialiased;
+    min-height: 100vh;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+    color: #1E293B;
+  }
+  #root { min-height: 100vh; width: 100%; }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-hero);
+  }
+  .bg-hero-gradient   { background-image: var(--gradient-hero); }
+  .bg-card-gradient   { background-image: var(--gradient-card); }
+  .bg-warm-gradient   { background-image: var(--gradient-warm); }
+  .shadow-soft        { box-shadow: var(--shadow-soft); }
+  .shadow-card        { box-shadow: var(--shadow-card); }
+  .shadow-elevated    { box-shadow: var(--shadow-elevated); }
+  .shadow-hover       { box-shadow: var(--shadow-hover); }
+
+  /* ── Premium white card with mint border ── */
+  .glass-card {
+    background: #FFFFFF;
+    border: 1px solid #D1FAE5;
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .glass-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-1px);
+    border-color: #A7F3D0;
+  }
+  .glass-card-dark {
+    background: #FFFFFF;
+    border: 1px solid #D1FAE5;
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Stat card accent borders */
+  .stat-card-gold  { @apply glass-card; border-top: 3px solid #D97706; }
+  .stat-card-green { @apply glass-card; border-top: 3px solid #10B981; }
+
+  /* ── Primary pill button — Vibrant Mint ── */
+  .btn-forest {
+    background: #34D399;
+    color: #1E293B;
+    border: none;
+    border-radius: 9999px;
+    font-weight: 600;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-forest:hover {
+    background: #A7F3D0;
+    box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+  }
+
+  /* ── Ghost button ── */
+  .btn-ghost-forest {
+    background: transparent;
+    color: #14532D;
+    border: 1.5px solid #10B981;
+    border-radius: 9999px;
+    font-weight: 600;
+    transition: background 0.15s ease;
+  }
+  .btn-ghost-forest:hover { background: #DCFCE7; }
+
+  /* ── Icon container ── */
+  .icon-container {
+    background: #DCFCE7;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #065F46;
+  }
+
+  /* ── Surface cards ── */
+  .surface-card {
+    background: #FFFFFF;
+    border: 1px solid #D1FAE5;
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+  }
+  .surface-card-2 {
+    background: #F0FDF4;
+    border: 1px solid #D1FAE5;
+    border-radius: 12px;
+  }
+
+  /* ── Mint highlight ── */
+  .mint-section {
+    background: #DCFCE7;
+    border: 1px solid #A7F3D0;
+    border-radius: 12px;
+  }
+
+  /* ── Nav glass ── */
+  .nav-glass {
+    background: rgba(249, 250, 251, 0.92);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border-bottom: 1px solid #D1FAE5;
+  }
+
+  /* ── Tabs active — Emerald Mint ── */
+  [data-state="active"][role="tab"] {
+    background: #10B981 !important;
+    color: #FFFFFF !important;
+    border-radius: 6px;
+  }
+
+  /* ── Verified badge ── */
+  .badge-verified {
+    background: #ECFCCB;
+    color: #3F6212;
+    border: 1px solid #BEF264;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+  }
+
+  /* ── Status ── */
+  .status-pending { color: #D97706; }
+  .status-active  { color: #0284C7; }
+  .status-done    { color: #16A34A; }
+
+  /* Scrollbar */
+  .scrollbar-emerald {
+    scrollbar-color: #A7F3D0 #F0FDF4;
+    scrollbar-width: thin;
+  }
+  .scrollbar-emerald::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-emerald::-webkit-scrollbar-track { background: #F0FDF4; border-radius: 10px; }
+  .scrollbar-emerald::-webkit-scrollbar-thumb { background: #A7F3D0; border-radius: 10px; }
+  .scrollbar-emerald::-webkit-scrollbar-thumb:hover { background: #10B981; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+}

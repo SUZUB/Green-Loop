@@ -1,0 +1,4 @@
+project_id = "epxddaolalqtbagcjzla"
+
+[functions.recycling-chat]
+verify_jwt = false
